@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Wgram com login
+// @name         Wgram com login end
 // @namespace    https://github.com/rm0ntoya
 // @version      1.1.0
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live com login e salvamento na nuvem.
