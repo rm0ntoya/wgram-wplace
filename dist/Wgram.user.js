@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.4.0
+// @version      1.5.0
 // @description  Um script de usuário para carregar templates do WGram Gerador de Pixel Art por ID, com info e contagem.
 // @author       rm0ntoya
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
-// @icon         https://i.ibb.co/twLDVJ3B/Image-fx-41-Photoroom.png
+// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png
 
 // @match        *://*.wplace.live/*
 
@@ -94,7 +94,7 @@
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
                 .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                .addImg({ alt: 'Ícone do Wgram', src: 'https://i.ibb.co/twLDVJ3B/Image-fx-41-Photoroom.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
+                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
             .addHr().buildElement()
@@ -106,10 +106,11 @@
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto aqui' }).buildElement()
-                .addDiv({ id: 'wgram-project-info', style: 'display: none;' })
+                .addDiv({ id: 'wgram-project-info' }) // Painel de info, começa escondido
                     .addP({ id: 'wgram-info-name' }).buildElement()
                     .addP({ id: 'wgram-info-creator' }).buildElement()
                     .addP({ id: 'wgram-info-pixels' }).buildElement()
+                    .addP({ id: 'wgram-info-coords' }).buildElement()
                 .buildElement()
                 .addDiv({ id: 'wgram-coords-container', style: 'display: none;' })
                     .addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement()
@@ -123,6 +124,9 @@
                 .buildElement()
             .buildElement()
             .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
+            .addDiv({ id: 'wgram-credits' })
+                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' })
+                .buildElement()
         .buildElement()
         .buildOverlay(document.body);
         this.handleDrag('wgram-overlay', 'wgram-drag-handle');
@@ -135,16 +139,23 @@
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
     displayProjectInfo(project) {
         const infoContainer = document.getElementById('wgram-project-info');
+        const coordsContainer = document.getElementById('wgram-info-coords');
         if (infoContainer) {
             this.updateElement('wgram-info-name', `<i class="fa-solid fa-file-signature fa-fw"></i> <strong>Nome:</strong> <span>${project.name}</span>`);
             this.updateElement('wgram-info-creator', `<i class="fa-solid fa-user fa-fw"></i> <strong>Criador:</strong> <span>${project.owner}</span>`);
             this.updateElement('wgram-info-pixels', `<i class="fa-solid fa-th fa-fw"></i> <strong>Píxeis:</strong> <span>${project.pixels.toLocaleString('pt-BR')}</span>`);
-            infoContainer.style.display = 'flex';
+            if (project.coords) {
+                this.updateElement('wgram-info-coords', `<i class="fa-solid fa-map-marker-alt fa-fw"></i> <strong>Coords:</strong> <span>${project.coords.join(', ')}</span>`);
+                coordsContainer.style.display = 'flex';
+            } else {
+                coordsContainer.style.display = 'none';
+            }
+            infoContainer.classList.add('visible');
         }
     }
     hideInfoAndCoords() {
         const infoContainer = document.getElementById('wgram-project-info');
-        if (infoContainer) infoContainer.style.display = 'none';
+        if (infoContainer) infoContainer.classList.remove('visible');
         this.toggleCoordsFields(false);
     }
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
@@ -174,13 +185,13 @@
             const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
             if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
 
-            this.uiManager.displayProjectInfo({ name: name, owner: ownerName, pixels: calculations.totalPixels });
+            const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
+            this.uiManager.displayProjectInfo({ name: name, owner: ownerName, pixels: calculations.totalPixels, coords: coordsArray });
 
             await docRef.update({ loads: firebase.firestore.FieldValue.increment(1) });
 
-            if (coordinates && coordinates.tl_x !== undefined) {
+            if (coordsArray) {
                 this.uiManager.toggleCoordsFields(false);
-                const coordsArray = [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number);
                 await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
             } else {
                 this.uiManager.displayError("Projeto não tem coordenadas. Por favor, insira-as.");
@@ -192,8 +203,8 @@
                     const px = document.getElementById('wgram-input-px').value;
                     const py = document.getElementById('wgram-input-py').value;
                     if (!tx || !ty || !px || !py) { return this.uiManager.displayError('Coordenadas incompletas.'); }
-                    const coordsArray = [tx, ty, px, py].map(Number);
-                    await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
+                    const manualCoordsArray = [tx, ty, px, py].map(Number);
+                    await this.createTemplateFromBase64(processedImageBase64, name, manualCoordsArray);
                     loadBtn.removeEventListener('click', tempListener);
                 };
                 loadBtn.addEventListener('click', tempListener);

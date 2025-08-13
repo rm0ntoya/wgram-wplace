@@ -44,7 +44,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 #wgram-header img {
@@ -129,15 +128,29 @@
     box-shadow: 0 0 0 2px rgba(74, 142, 255, 0.3);
 }
 
-/* Painel de Informações do Projeto */
+/* Painel de Informações do Projeto com Animação */
 #wgram-project-info {
     background-color: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
-    padding: 12px;
     font-size: 0.9em;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    transition: all 0.4s ease-in-out;
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    padding: 0 12px;
+    margin: 0;
+    overflow: hidden;
+}
+
+#wgram-project-info.visible {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 300px; /* Altura máxima para a animação */
+    padding: 12px;
+    margin-bottom: 12px;
 }
 
 #wgram-project-info p {
@@ -151,6 +164,7 @@
 #wgram-project-info strong {
     color: #9ca3af; /* text-gray-400 */
     font-weight: 500;
+    min-width: 60px; /* Alinha os valores */
 }
 
 #wgram-project-info span {
@@ -200,4 +214,17 @@
     font-size: 0.8em;
     text-align: center;
     color: #aaa;
+}
+
+/* Créditos */
+#wgram-credits {
+    text-align: center;
+    font-size: 0.75em;
+    color: #6b7280;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+#wgram-credits strong {
+    color: #9ca3af;
 }
