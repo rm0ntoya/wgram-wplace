@@ -181,38 +181,81 @@
       async signUp(email, password) { try { await this.auth.createUserWithEmailAndPassword(email, password); this.uiManager.updateElement('wgram-auth-status', 'Registo bem-sucedido! A entrar...', true); } catch (error) { this.uiManager.updateElement('wgram-auth-status', `Erro no registo: ${error.message}`, true); } }
       async logIn(email, password) { try { await this.auth.signInWithEmailAndPassword(email, password); } catch (error) { this.uiManager.updateElement('wgram-auth-status', `Erro no login: ${error.message}`, true); } }
       async logOut() { await this.auth.signOut(); }
-      async saveAndCopyCoordsId(coords) {
-          const user = this.auth.currentUser;
-          if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
+async saveAndCopyCoordsId(coords) {
+        const user = this.auth.currentUser;
+        if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
 
-          const hexId = Math.random().toString(16).substr(2, 8);
-          const userDocRef = this.db.collection('users').doc(user.uid);
-          
-          try {
-              const userDoc = await userDocRef.get();
-              const wplaceUsername = userDoc.exists ? userDoc.data().wplaceUsername : 'Desconhecido';
+        // --- INÍCIO DAS MODIFICAÇÕES ---
 
-              const coordsData = {
-                  coords: {
-                      tl_x: coords[0], tl_y: coords[1],
-                      px_x: coords[2], px_y: coords[3],
-                  },
-                  creatorId: user.uid,
-                  creatorEmail: user.email,
-                  creatorWplaceUser: wplaceUsername,
-                  createdAt: firebase.firestore.FieldValue.serverTimestamp()
-              };
+        // 1. Inicializar as variáveis de localização como nulas.
+        //    Isso garante que, se algo falhar, salvaremos um valor nulo em vez de dar erro.
+        let locationLat = null;
+        let locationLng = null;
+        let locationZoom = null;
+        let locationUrl = null;
 
-              await this.db.collection('sharedCoords').doc(hexId).set(coordsData);
-              
-              navigator.clipboard.writeText(hexId);
-              this.uiManager.displayStatus(`ID de Coordenadas "${hexId}" copiado!`);
+        try {
+            // 2. Ler a string JSON do localStorage.
+            const locationString = localStorage.getItem('location');
+            if (locationString) {
+                // 3. Analisar (parse) a string JSON para um objeto.
+                const locationData = JSON.parse(locationString);
+                
+                // 4. Atribuir os valores às nossas variáveis.
+                locationLat = locationData.lat || null;
+                locationLng = locationData.lng || null;
+                locationZoom = locationData.zoom || null;
 
-          } catch (error) {
-              this.uiManager.displayError("Falha ao salvar coordenadas.");
-              console.error(error);
-          }
-      }
+                // 5. Construir a URL com os dados obtidos.
+                if (locationLat && locationLng && locationZoom) {
+                    locationUrl = `https://wplace.live/?lat=${locationLat}&lng=${locationLng}&zoom=${locationZoom}`;
+                }
+            }
+        } catch (e) {
+            console.error("Wgram: Erro ao ler ou analisar 'location' do localStorage.", e);
+            // As variáveis permanecerão nulas, então o processo continua sem falhar.
+        }
+
+        // --- FIM DAS MODIFICAÇÕES ---
+
+        const hexId = Math.random().toString(16).substr(2, 8);
+        const userDocRef = this.db.collection('users').doc(user.uid);
+        
+        try {
+            const userDoc = await userDocRef.get();
+            const wplaceUsername = userDoc.exists ? userDoc.data().wplaceUsername : 'Desconhecido';
+
+            const coordsData = {
+                coords: {
+                    tl_x: coords[0], tl_y: coords[1],
+                    px_x: coords[2], px_y: coords[3],
+                },
+                
+                // --- ADIÇÃO DOS NOVOS CAMPOS ---
+                location: {
+                    lat: locationLat,
+                    lng: locationLng,
+                    zoom: locationZoom
+                },
+                locationUrl: locationUrl, // O link completo
+                // ---------------------------------
+
+                creatorId: user.uid,
+                creatorEmail: user.email,
+                creatorWplaceUser: wplaceUsername,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await this.db.collection('sharedCoords').doc(hexId).set(coordsData);
+            
+            navigator.clipboard.writeText(hexId);
+            this.uiManager.displayStatus(`ID de Coordenadas "${hexId}" copiado!`);
+
+        } catch (error) {
+            this.uiManager.displayError("Falha ao salvar coordenadas.");
+            console.error(error);
+        }
+    }
   }
 
   // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
