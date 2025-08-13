@@ -7,7 +7,7 @@
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
-// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png
+// @icon         https://i.ibb.co/twLDVJ3B/Image-fx-41-Photoroom.png
 
 // @match        *://*.wplace.live/*
 
