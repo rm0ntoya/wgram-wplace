@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.3.0
+// @version      1.4.0
 // @description  Um script de usuário para carregar templates do WGram Gerador de Pixel Art por ID, com info e contagem.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -19,6 +19,7 @@
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js
 
 // @run-at       document-end
 
@@ -105,7 +106,7 @@
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto aqui' }).buildElement()
-                .addDiv({ id: 'wgram-project-info', style: 'display: none;' }) // Painel de info, começa escondido
+                .addDiv({ id: 'wgram-project-info', style: 'display: none;' })
                     .addP({ id: 'wgram-info-name' }).buildElement()
                     .addP({ id: 'wgram-info-creator' }).buildElement()
                     .addP({ id: 'wgram-info-pixels' }).buildElement()
@@ -117,7 +118,7 @@
                     .addInput({ type: 'number', id: 'wgram-input-py', placeholder: 'Px Y' }).buildElement()
                 .buildElement()
                 .addDiv({ id: 'wgram-template-buttons' })
-                    .addButton({ id: 'wgram-btn-load', textContent: 'Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
+                    .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
                     .buildElement()
                 .buildElement()
             .buildElement()
@@ -135,10 +136,10 @@
     displayProjectInfo(project) {
         const infoContainer = document.getElementById('wgram-project-info');
         if (infoContainer) {
-            this.updateElement('wgram-info-name', `Nome: ${project.name}`);
-            this.updateElement('wgram-info-creator', `Criador: ${project.owner}`);
-            this.updateElement('wgram-info-pixels', `Píxeis: ${project.pixels.toLocaleString('pt-BR')}`);
-            infoContainer.style.display = 'block';
+            this.updateElement('wgram-info-name', `<i class="fa-solid fa-file-signature fa-fw"></i> <strong>Nome:</strong> <span>${project.name}</span>`);
+            this.updateElement('wgram-info-creator', `<i class="fa-solid fa-user fa-fw"></i> <strong>Criador:</strong> <span>${project.owner}</span>`);
+            this.updateElement('wgram-info-pixels', `<i class="fa-solid fa-th fa-fw"></i> <strong>Píxeis:</strong> <span>${project.pixels.toLocaleString('pt-BR')}</span>`);
+            infoContainer.style.display = 'flex';
         }
     }
     hideInfoAndCoords() {
@@ -175,7 +176,6 @@
 
             this.uiManager.displayProjectInfo({ name: name, owner: ownerName, pixels: calculations.totalPixels });
 
-            // Incrementa o contador de carregamentos
             await docRef.update({ loads: firebase.firestore.FieldValue.increment(1) });
 
             if (coordinates && coordinates.tl_x !== undefined) {
