@@ -3,8 +3,8 @@
 /* Importa a fonte 'Inter' do Google Fonts para um visual mais limpo */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
-/* Estilo geral do painel */
-#wgram-overlay {
+/* Estilo geral dos painéis (Login e Principal) */
+#wgram-overlay, #wgram-login-overlay {
   position: fixed;
   top: 20px;
   right: 20px;
@@ -23,7 +23,7 @@
   overflow: hidden;
 }
 
-/* Estilo para quando o painel está minimizado */
+/* Estilo para quando o painel principal está minimizado */
 #wgram-overlay.minimized {
   width: 52px;
   height: 52px;
@@ -84,13 +84,19 @@
 }
 
 /* Informações do Usuário */
-#wgram-user-info p {
+#wgram-user-info p, #wgram-user-profile {
     margin: 4px 0;
     font-size: 0.9em;
 }
 
+#wgram-user-profile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 /* Controles e inputs */
-#wgram-template-controls, #wgram-user-info {
+#wgram-template-controls, #wgram-user-info, #wgram-login-overlay {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -103,7 +109,8 @@
 }
 
 #wgram-overlay input[type="number"],
-#wgram-overlay textarea {
+#wgram-overlay textarea,
+#wgram-login-overlay input {
   background-color: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #e0e0e0;
@@ -116,7 +123,8 @@
 }
 
 #wgram-overlay input[type="number"]:focus,
-#wgram-overlay textarea:focus {
+#wgram-overlay textarea:focus,
+#wgram-login-overlay input:focus {
     outline: none;
     border-color: #4a8eff;
     box-shadow: 0 0 0 2px rgba(74, 142, 255, 0.3);
@@ -129,13 +137,13 @@
 }
 
 /* Botões */
-#wgram-template-buttons {
+#wgram-template-buttons, #wgram-login-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-#wgram-overlay button {
+#wgram-overlay button, #wgram-login-overlay button {
   background: linear-gradient(to right, #4a8eff, #2e6cdf);
   color: white;
   border: none;
@@ -148,12 +156,12 @@
   font-size: 0.9em;
 }
 
-#wgram-overlay button:hover {
+#wgram-overlay button:hover, #wgram-login-overlay button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-#wgram-overlay button:active {
+#wgram-overlay button:active, #wgram-login-overlay button:active {
     transform: translateY(0);
     box-shadow: none;
 }
@@ -173,11 +181,16 @@ div:has(> #wgram-input-file) > button:hover {
     border-color: #4a8eff;
 }
 
-
 #wgram-template-buttons #wgram-btn-create {
     grid-column: 1 / -1; /* Botão Criar ocupa a largura toda */
 }
 
-#wgram-btn-disable {
+#wgram-btn-disable, #wgram-logout-btn {
     background: linear-gradient(to right, #6c757d, #5a6268);
+}
+
+#wgram-auth-status {
+    font-size: 0.8em;
+    text-align: center;
+    color: #aaa;
 }
