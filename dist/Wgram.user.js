@@ -18,7 +18,7 @@
 
 // @run-at       document-start
 
-// @resource     WGRAM_CSS https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/style.css // TODO: Mude para o link RAW do seu CSS no GitHub
+// @resource     WGRAM_CSS https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/style.css /raw/main/dist/style.css  // TODO: Mude para o link RAW do seu CSS no GitHub
 // @updateURL    https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/Wgram.meta.js
 // @downloadURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/Wgram.user.js
 // ==/UserScript==
