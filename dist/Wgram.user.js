@@ -20,7 +20,7 @@
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js
 
-// @run-at       document-start
+// @run-at       document-end
 
 // @resource     WGRAM_CSS https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/style.css
 // @updateURL    https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/Wgram.meta.js
