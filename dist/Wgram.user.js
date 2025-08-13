@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Wgram
-// @namespace    https://github.com/SeuUsuario // TODO: Mude para o seu namespace (seu perfil do GitHub, por exemplo)
-// @version      1.0.0
+// @namespace    https://github.com/rm0ntoya
+// @version      1.0.2
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live. Use em conformidade com os Termos de Serviço do site.
-// @author       Seu Nome Aqui // TODO: Coloque seu nome ou nome de usuário
+// @author       rm0ntoya
 // @license      MPL-2.0
-// @homepageURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js  // TODO: Mude para o link do seu repositório no GitHub
-// @supportURL   https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /issues // TODO: (Opcional) Mude para o seu link de suporte (página de Issues, Discord, etc.)
-// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png // TODO: Mude para o link do ícone do seu projeto
+// @homepageURL  https://github.com/rm0ntoya/wgram-wplace
+// @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
+// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png
 
 // @match        *://*.wplace.live/*
 
@@ -18,9 +18,9 @@
 
 // @run-at       document-start
 
-// @resource     WGRAM_CSS https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/style.css  // TODO: Mude para o link RAW do seu CSS no GitHub
-// @updateURL    https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/Wgram.meta.js
-// @downloadURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/Wgram.user.js
+// @resource     WGRAM_CSS https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/style.css
+// @updateURL    https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/Wgram.meta.js
+// @downloadURL  https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/Wgram.user.js
 // ==/UserScript==
 
 (() => {
@@ -153,7 +153,7 @@
   class WgramScript {
     constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.templateManager = this.templateManager; this.uiManager.apiManager = this.apiManager; }
     async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.injector.injectFetchSpy(this.info.name); this.apiManager.initializeApiListener(); await this.templateManager.loadTemplates(); this.uiManager.buildMainOverlay(); console.log(`[${this.info.name}] Carregado com sucesso!`); }
-    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
+    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.name}] Falha ao injetar CSS:`, error); } }
   }
 
   const wgram = new WgramScript();
