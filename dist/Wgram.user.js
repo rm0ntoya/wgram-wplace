@@ -262,27 +262,51 @@ async saveAndCopyCoordsId(coords) {
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
-    async loadItemFromFirestore(id) {
+async loadItemFromFirestore(id) {
         this.uiManager.displayStatus(`A procurar ID ${id}...`);
         this.uiManager.hideInfoAndCoords();
 
+        // 1. Unifica a busca. Primeiro tenta em 'publicProjects'.
         const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
-        const projectDoc = await projectDocRef.get();
+        let docSnap = await projectDocRef.get();
 
-        if (projectDoc.exists) {
-            await this.loadProject(projectDoc);
-            return;
+        // 2. Se não encontrar, tenta em 'sharedCoords'.
+        if (!docSnap.exists()) {
+            const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
+            docSnap = await coordsDocRef.get();
         }
 
-        const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
-        const coordsDoc = await coordsDocRef.get();
-
-        if (coordsDoc.exists) {
-            await this.loadCoords(coordsDoc);
-            return;
+        // 3. Se não encontrou em nenhum lugar, exibe o erro.
+        if (!docSnap.exists()) {
+            return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
         }
 
-        this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
+        const data = docSnap.data();
+
+        // 4. --- LÓGICA DE REDIRECIONAMENTO ---
+        // Verifica se existe uma URL e se é diferente da URL atual (para evitar loops).
+        if (data.locationUrl && data.locationUrl !== window.location.href.split('#')[0]) {
+            this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
+            
+            // Salva a "intenção" de carregar o ID no sessionStorage.
+            sessionStorage.setItem('wgram_pending_load', id);
+            
+            // Redireciona a página.
+            window.location.href = data.locationUrl;
+            
+            // Para a execução do script aqui, pois a página será recarregada.
+            return; 
+        }
+
+        // 5. Se não precisou redirecionar, continua o carregamento normal.
+        // Verifica se tem uma imagem para carregar (é um projeto completo).
+        if (data.processedImageBase64) {
+            await this.loadProject(docSnap);
+        } 
+        // Se não, verifica se tem coordenadas (é apenas um compartilhamento de local).
+        else if (data.coords) {
+            await this.loadCoords(docSnap);
+        }
     }
     async loadProject(doc) {
         const projectData = doc.data();
@@ -378,7 +402,39 @@ async saveAndCopyCoordsId(coords) {
   // --- Módulo: src/main.js ---
   class WgramScript {
     constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.authManager = this.authManager; this.uiManager.templateManager = this.templateManager; this.uiManager.apiManager = this.apiManager; }
-    async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.authManager.onAuthStateChanged(async (user) => { if (user) { console.log("Utilizador logado:", user.email); this.uiManager.buildMainOverlay(user); this.templateManager.setUserId(user.uid); this.injector.injectFetchSpy(); this.apiManager.initializeApiListener(); } else { console.log("Nenhum utilizador logado."); this.uiManager.destroyOverlay('wgram-overlay'); this.uiManager.buildLoginOverlay(); } }); }
+    async start() {
+        console.log(`[${this.info.name}] v${this.info.version} a iniciar...`);
+        this.injectCSS();
+        this.authManager.onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log("Utilizador logado:", user.email);
+                this.uiManager.buildMainOverlay(user);
+                this.templateManager.setUserId(user.uid);
+                this.injector.injectFetchSpy();
+                this.apiManager.initializeApiListener();
+
+                // --- LÓGICA DE CARREGAMENTO PENDENTE ---
+                // 1. Verifica se há uma "intenção" salva no sessionStorage.
+                const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
+                
+                if (pendingLoadId) {
+                    console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
+                    
+                    // 2. Limpa o sessionStorage IMEDIATAMENTE para evitar re-execução.
+                    sessionStorage.removeItem('wgram_pending_load');
+                    
+                    // 3. Executa o carregamento.
+                    // Usamos um pequeno timeout para garantir que a UI esteja pronta.
+                    setTimeout(() => this.templateManager.loadItemFromFirestore(pendingLoadId), 100);
+                }
+
+            } else {
+                console.log("Nenhum utilizador logado.");
+                this.uiManager.destroyOverlay('wgram-overlay');
+                this.uiManager.buildLoginOverlay();
+            }
+        });
+    }
     injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
   }
 
