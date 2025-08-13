@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.0.5
+// @version      1.0.6
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live. Use em conformidade com os Termos de Serviço do site.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -66,10 +66,54 @@
     addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
   }
 
-  // --- Módulo: src/core/Template.js ---
+  // --- Módulo: src/core/Template.js (CORRIGIDO) ---
   class Template {
     constructor({ displayName = 'Meu Template', authorId = '', coords = [0,0,0,0] }) { this.id = crypto.randomUUID(); this.displayName = displayName; this.authorId = authorId; this.coords = coords; this.pixelCount = 0; this.width = 0; this.height = 0; this.chunks = {}; }
-    async processImage(file) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; const mainBitmap = await createImageBitmap(file); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = this.width * this.height; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d', { willReadFrequently: true }) }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } this.chunks[tileKey].ctx.drawImage(mainBitmap, x, y, 1, 1, pixelXInTile * RENDER_SCALE, pixelYInTile * RENDER_SCALE, RENDER_SCALE, RENDER_SCALE); } } for (const tileKey in this.chunks) { const chunk = this.chunks[tileKey]; chunk.bitmap = await chunk.canvas.transferToImageBitmap(); delete chunk.canvas; delete chunk.ctx; } }
+    async processImage(file) {
+        const TILE_SIZE = 1000;
+        const RENDER_SCALE = 3;
+        const mainBitmap = await createImageBitmap(file);
+        this.width = mainBitmap.width;
+        this.height = mainBitmap.height;
+        this.pixelCount = this.width * this.height;
+        const [startTileX, startTileY, startPixelX, startPixelY] = this.coords;
+
+        const tempCanvas = new OffscreenCanvas(1, 1);
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const currentGlobalPixelX = startPixelX + x;
+                const currentGlobalPixelY = startPixelY + y;
+                const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE);
+                const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE);
+                const pixelXInTile = currentGlobalPixelX % TILE_SIZE;
+                const pixelYInTile = currentGlobalPixelY % TILE_SIZE;
+                const tileKey = `${tileX},${tileY}`;
+
+                if (!this.chunks[tileKey]) {
+                    const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE);
+                    this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') };
+                    this.chunks[tileKey].ctx.imageSmoothingEnabled = false;
+                }
+
+                tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1);
+                const pixelData = tempCtx.getImageData(0, 0, 1, 1).data;
+
+                if (pixelData[3] === 0) continue;
+
+                this.chunks[tileKey].ctx.fillStyle = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`;
+                this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1);
+            }
+        }
+
+        for (const tileKey in this.chunks) {
+            const chunk = this.chunks[tileKey];
+            chunk.bitmap = await chunk.canvas.transferToImageBitmap();
+            delete chunk.canvas;
+            delete chunk.ctx;
+        }
+    }
     getChunkForTile(tileCoords) { const tileKey = `${tileCoords[0]},${tileCoords[1]}`; const chunk = this.chunks[tileKey]; if (chunk && chunk.bitmap) { return { bitmap: chunk.bitmap, drawX: 0, drawY: 0 }; } return null; }
     toJSON() { return { id: this.id, displayName: this.displayName, authorId: this.authorId, coords: this.coords, width: this.width, height: this.height, pixelCount: this.pixelCount }; }
     static async fromJSON(jsonData) { const template = new Template(jsonData); template.id = jsonData.id; template.width = jsonData.width; template.height = jsonData.height; template.pixelCount = jsonData.pixelCount; return template; }
@@ -87,7 +131,7 @@
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
 
-  // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
+  // --- Módulo: src/core/TemplateManager.js ---
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.schemaVersion = '1.0.0'; this.uiManager = uiManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
