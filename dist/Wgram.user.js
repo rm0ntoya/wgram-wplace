@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.2.0
-// @description  Um script de usuário para carregar templates do WGram Gerador de Pixel Art por ID.
+// @version      1.3.0
+// @description  Um script de usuário para carregar templates do WGram Gerador de Pixel Art por ID, com info e contagem.
 // @author       rm0ntoya
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
@@ -57,66 +57,10 @@
     addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
   }
 
-  // --- Módulo: src/core/Template.js (MODIFICADO) ---
+  // --- Módulo: src/core/Template.js ---
   class Template {
-    constructor({ displayName = 'Template Carregado', authorId = '', coords = [0,0,0,0], chunks = {} }) {
-        this.id = crypto.randomUUID();
-        this.displayName = displayName;
-        this.authorId = authorId;
-        this.coords = coords;
-        this.pixelCount = 0;
-        this.width = 0;
-        this.height = 0;
-        this.chunks = chunks;
-    }
-    async processImage(dataSource) {
-        const TILE_SIZE = 1000;
-        const RENDER_SCALE = 3;
-
-        let imageSource = dataSource;
-        if (typeof dataSource === 'string') {
-            const img = new Image();
-            img.src = dataSource; // dataSource é uma string base64
-            await new Promise(resolve => img.onload = resolve);
-            imageSource = img;
-        }
-
-        const mainBitmap = await createImageBitmap(imageSource);
-        this.width = mainBitmap.width;
-        this.height = mainBitmap.height;
-        this.pixelCount = this.width * this.height;
-        const [startTileX, startTileY, startPixelX, startPixelY] = this.coords;
-        const tempCanvas = new OffscreenCanvas(1, 1);
-        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
-
-        for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                const currentGlobalPixelX = startPixelX + x;
-                const currentGlobalPixelY = startPixelY + y;
-                const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE);
-                const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE);
-                const pixelXInTile = currentGlobalPixelX % TILE_SIZE;
-                const pixelYInTile = currentGlobalPixelY % TILE_SIZE;
-                const tileKey = `${tileX},${tileY}`;
-                if (!this.chunks[tileKey]) {
-                    const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE);
-                    this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') };
-                    this.chunks[tileKey].ctx.imageSmoothingEnabled = false;
-                }
-                tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1);
-                const pixelData = tempCtx.getImageData(0, 0, 1, 1).data;
-                if (pixelData[3] === 0) continue;
-                this.chunks[tileKey].ctx.fillStyle = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`;
-                this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1);
-            }
-        }
-        for (const tileKey in this.chunks) {
-            const chunk = this.chunks[tileKey];
-            chunk.bitmap = await chunk.canvas.transferToImageBitmap();
-            delete chunk.canvas;
-            delete chunk.ctx;
-        }
-    }
+    constructor({ displayName = 'Template Carregado', authorId = '', coords = [0,0,0,0], chunks = {} }) { this.id = crypto.randomUUID(); this.displayName = displayName; this.authorId = authorId; this.coords = coords; this.pixelCount = 0; this.width = 0; this.height = 0; this.chunks = chunks; }
+    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = this.width * this.height; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue; this.chunks[tileKey].ctx.fillStyle = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`; this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1); } } for (const tileKey in this.chunks) { const chunk = this.chunks[tileKey]; chunk.bitmap = await chunk.canvas.transferToImageBitmap(); delete chunk.canvas; delete chunk.ctx; } }
     getChunkForTile(tileCoords) { const tileKey = `${tileCoords[0]},${tileCoords[1]}`; const chunk = this.chunks[tileKey]; if (chunk && chunk.bitmap) { return { bitmap: chunk.bitmap, drawX: 0, drawY: 0 }; } return null; }
   }
 
@@ -161,7 +105,12 @@
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto aqui' }).buildElement()
-                .addDiv({ id: 'wgram-coords-container', style: 'display: none;' }) // Começa escondido
+                .addDiv({ id: 'wgram-project-info', style: 'display: none;' }) // Painel de info, começa escondido
+                    .addP({ id: 'wgram-info-name' }).buildElement()
+                    .addP({ id: 'wgram-info-creator' }).buildElement()
+                    .addP({ id: 'wgram-info-pixels' }).buildElement()
+                .buildElement()
+                .addDiv({ id: 'wgram-coords-container', style: 'display: none;' })
                     .addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement()
                     .addInput({ type: 'number', id: 'wgram-input-ty', placeholder: 'Tl Y' }).buildElement()
                     .addInput({ type: 'number', id: 'wgram-input-px', placeholder: 'Px X' }).buildElement()
@@ -179,16 +128,23 @@
     }
     #handleLoadProject() {
         const projectId = document.getElementById('wgram-project-id').value.trim();
-        if (!projectId) {
-            return this.displayError("Por favor, insira um ID de projeto.");
-        }
+        if (!projectId) { return this.displayError("Por favor, insira um ID de projeto."); }
         this.templateManager.loadProjectFromFirestore(projectId);
     }
-    toggleCoordsFields(show) {
-        const coordsContainer = document.getElementById('wgram-coords-container');
-        if (coordsContainer) {
-            coordsContainer.style.display = show ? 'grid' : 'none';
+    toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
+    displayProjectInfo(project) {
+        const infoContainer = document.getElementById('wgram-project-info');
+        if (infoContainer) {
+            this.updateElement('wgram-info-name', `Nome: ${project.name}`);
+            this.updateElement('wgram-info-creator', `Criador: ${project.owner}`);
+            this.updateElement('wgram-info-pixels', `Píxeis: ${project.pixels.toLocaleString('pt-BR')}`);
+            infoContainer.style.display = 'block';
         }
+    }
+    hideInfoAndCoords() {
+        const infoContainer = document.getElementById('wgram-project-info');
+        if (infoContainer) infoContainer.style.display = 'none';
+        this.toggleCoordsFields(false);
     }
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
@@ -204,32 +160,23 @@
 
   // --- Módulo: src/core/TemplateManager.js (MODIFICADO) ---
   class TemplateManager {
-    constructor(scriptName, scriptVersion, uiManager, authManager) {
-        this.scriptName = scriptName;
-        this.scriptVersion = scriptVersion;
-        this.uiManager = uiManager;
-        this.authManager = authManager;
-        this.userId = null;
-        this.templates = [];
-        this.templatesShouldBeDrawn = true;
-    }
+    constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
     async loadProjectFromFirestore(projectId) {
         this.uiManager.displayStatus(`A procurar projeto ${projectId}...`);
+        this.uiManager.hideInfoAndCoords();
         try {
             const docRef = this.authManager.db.collection('publicProjects').doc(projectId);
             const doc = await docRef.get();
-
-            if (!doc.exists) {
-                return this.uiManager.displayError("Projeto público não encontrado com este ID.");
-            }
-
+            if (!doc.exists) { return this.uiManager.displayError("Projeto público não encontrado com este ID."); }
             const projectData = doc.data();
-            const { processedImageBase64, name, coordinates } = projectData;
+            const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
+            if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
 
-            if (!processedImageBase64) {
-                return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template.");
-            }
+            this.uiManager.displayProjectInfo({ name: name, owner: ownerName, pixels: calculations.totalPixels });
+
+            // Incrementa o contador de carregamentos
+            await docRef.update({ loads: firebase.firestore.FieldValue.increment(1) });
 
             if (coordinates && coordinates.tl_x !== undefined) {
                 this.uiManager.toggleCoordsFields(false);
@@ -238,45 +185,24 @@
             } else {
                 this.uiManager.displayError("Projeto não tem coordenadas. Por favor, insira-as.");
                 this.uiManager.toggleCoordsFields(true);
-                // Adiciona um listener temporário ao botão para usar as coordenadas manuais
                 const loadBtn = document.getElementById('wgram-btn-load');
                 const tempListener = async () => {
                     const tx = document.getElementById('wgram-input-tx').value;
                     const ty = document.getElementById('wgram-input-ty').value;
                     const px = document.getElementById('wgram-input-px').value;
                     const py = document.getElementById('wgram-input-py').value;
-                    if (!tx || !ty || !px || !py) {
-                        return this.uiManager.displayError('Coordenadas incompletas.');
-                    }
+                    if (!tx || !ty || !px || !py) { return this.uiManager.displayError('Coordenadas incompletas.'); }
                     const coordsArray = [tx, ty, px, py].map(Number);
                     await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
-                    loadBtn.removeEventListener('click', tempListener); // Remove o listener para não acumular
+                    loadBtn.removeEventListener('click', tempListener);
                 };
                 loadBtn.addEventListener('click', tempListener);
             }
-        } catch (error) {
-            this.uiManager.displayError("Erro ao comunicar com a base de dados.");
-            console.error(error);
-        }
+        } catch (error) { this.uiManager.displayError("Erro ao comunicar com a base de dados."); console.error(error); }
     }
-    async createTemplateFromBase64(base64, name, coords) {
-        this.uiManager.displayStatus(`A processar o template "${name}"...`);
-        try {
-            const template = new Template({ displayName: name, coords: coords });
-            await template.processImage(base64);
-            this.templates = [template]; // Substitui o template atual pelo novo
-            this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`);
-            this.setTemplatesShouldBeDrawn(true);
-        } catch (error) {
-            this.uiManager.displayError(`Falha ao processar o template: ${error.message}`);
-            console.error(error);
-        }
-    }
+    async createTemplateFromBase64(base64, name, coords) { this.uiManager.displayStatus(`A processar o template "${name}"...`); try { const template = new Template({ displayName: name, coords: coords }); await template.processImage(base64); this.templates = [template]; this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`); this.setTemplatesShouldBeDrawn(true); } catch (error) { this.uiManager.displayError(`Falha ao processar o template: ${error.message}`); console.error(error); } }
     async drawTemplateOnTile(tileBlob, tileCoords) { if (!this.templatesShouldBeDrawn || this.templates.length === 0) { return tileBlob; } const RENDER_SCALE = 3; const tileBitmap = await createImageBitmap(tileBlob); const scaledWidth = tileBitmap.width * RENDER_SCALE; const scaledHeight = tileBitmap.height * RENDER_SCALE; const canvas = new OffscreenCanvas(scaledWidth, scaledHeight); const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight); for (const template of this.templates) { const chunk = template.getChunkForTile(tileCoords); if (chunk) { ctx.drawImage(chunk.bitmap, 0, 0); } } return await canvas.convertToBlob({ type: 'image/png' }); }
-    setTemplatesShouldBeDrawn(shouldDraw) {
-        this.templatesShouldBeDrawn = shouldDraw;
-        this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`);
-    }
+    setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
   }
 
   // --- Módulo: src/core/ApiManager.js ---
@@ -284,8 +210,7 @@
     constructor(templateManager, uiManager) { this.templateManager = templateManager; this.uiManager = uiManager; this.disableAll = false; this.coordsTilePixel = []; }
     initializeApiListener() { window.addEventListener('message', async (event) => { const { data } = event; if (!data || !data.isWgramMessage || data.source !== 'wgram-spy') { return; } const endpoint = this.#parseEndpoint(data.endpoint); if (endpoint === 'tiles') { await this.#handleTileResponse(data); return; } if (data.jsonData) { this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint); } }); }
     #parseEndpoint(url) { if (!url) return ''; return url.split('?')[0].split('/').filter(s => s && isNaN(Number(s)) && !s.includes('.')).pop() || ''; }
-    #handleJsonResponse(endpoint, jsonData, fullUrl) { switch (endpoint) { case 'me': this.#processUserData(jsonData); break; case 'pixel': this.#processPixelCoords(fullUrl); break; case 'robots': this.disableAll = jsonData.userscript?.toString().toLowerCase() === 'false'; if (this.disableAll) { this.uiManager.displayError("O script foi desativado pelo proprietário do site."); } break; } }
-    #processUserData(data) { /* Não é mais necessário */ }
+    #handleJsonResponse(endpoint, jsonData, fullUrl) { switch (endpoint) { case 'pixel': this.#processPixelCoords(fullUrl); break; } }
     #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); this.uiManager.updateElement('wgram-input-tx', this.coordsTilePixel[0]); this.uiManager.updateElement('wgram-input-ty', this.coordsTilePixel[1]); this.uiManager.updateElement('wgram-input-px', this.coordsTilePixel[2]); this.uiManager.updateElement('wgram-input-py', this.coordsTilePixel[3]); }
     async #handleTileResponse(data) { let tileCoords = data.endpoint.split('/'); tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; const { blobID, blobData, blink } = data; const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords); window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*'); }
   }
@@ -335,33 +260,8 @@
 
   // --- Módulo: src/main.js ---
   class WgramScript {
-    constructor() {
-        this.info = { name: GM_info.script.name, version: GM_info.script.version };
-        this.uiManager = new UIManager(this.info.name, this.info.version);
-        this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager);
-        this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager);
-        this.apiManager = new ApiManager(this.templateManager, this.uiManager);
-        this.injector = new Injector();
-        this.uiManager.authManager = this.authManager;
-        this.uiManager.templateManager = this.templateManager;
-    }
-    async start() {
-        console.log(`[${this.info.name}] v${this.info.version} a iniciar...`);
-        this.injectCSS();
-        this.authManager.onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log("Utilizador logado:", user.email);
-                this.uiManager.buildMainOverlay(user);
-                this.templateManager.setUserId(user.uid);
-                this.injector.injectFetchSpy();
-                this.apiManager.initializeApiListener();
-            } else {
-                console.log("Nenhum utilizador logado.");
-                this.uiManager.destroyOverlay('wgram-overlay');
-                this.uiManager.buildLoginOverlay();
-            }
-        });
-    }
+    constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.authManager = this.authManager; this.uiManager.templateManager = this.templateManager; }
+    async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.authManager.onAuthStateChanged(async (user) => { if (user) { console.log("Utilizador logado:", user.email); this.uiManager.buildMainOverlay(user); this.templateManager.setUserId(user.uid); this.injector.injectFetchSpy(); this.apiManager.initializeApiListener(); } else { console.log("Nenhum utilizador logado."); this.uiManager.destroyOverlay('wgram-overlay'); this.uiManager.buildLoginOverlay(); } }); }
     injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
   }
 
