@@ -1,142 +1,107 @@
 import Template from './Template.js';
-import { numberToEncoded, base64ToUint8 } from '../utils/helpers.js';
-import { ENCODING_BASE } from '../utils/constants.js';
 
 /**
- * Gerencia todo o sistema de templates, incluindo criação, armazenamento e renderização.
+ * Gerencia todo o sistema de templates, incluindo o carregamento de projetos do Firestore.
  * @class TemplateManager
  */
 export default class TemplateManager {
-  /**
-   * Construtor da classe TemplateManager.
-   * @param {string} scriptName - O nome do script.
-   * @param {string} scriptVersion - A versão do script.
-   * @param {UIManager} uiManager - A instância do UIManager.
-   */
-  constructor(scriptName, scriptVersion, uiManager) {
-    this.scriptName = scriptName;
-    this.scriptVersion = scriptVersion;
-    this.schemaVersion = '1.0.0';
-    this.uiManager = uiManager;
-
-    this.userId = null;
-    this.templates = []; // Array de instâncias da classe Template
-    this.templatesShouldBeDrawn = true;
-  }
-
-  /**
-   * Define o ID do usuário atual.
-   * @param {number} id - O ID numérico do usuário.
-   */
-  setUserId(id) {
-    this.userId = id;
-  }
-
-  /**
-   * Carrega os templates salvos no armazenamento do Tampermonkey.
-   */
-  async loadTemplates() {
-    const savedData = JSON.parse(await GM.getValue('wgramTemplates', '{}'));
-
-    if (!savedData.templates || savedData.whoami !== 'Wgram') {
-      console.log('[Wgram] Nenhum template salvo encontrado ou formato inválido.');
-      return;
+    constructor(scriptName, scriptVersion, uiManager, authManager) {
+        this.scriptName = scriptName;
+        this.scriptVersion = scriptVersion;
+        this.uiManager = uiManager;
+        this.authManager = authManager;
+        this.userId = null;
+        this.templates = [];
+        this.templatesShouldBeDrawn = true;
     }
 
-    this.templates = [];
-    for (const templateData of Object.values(savedData.templates)) {
-        const template = await Template.fromJSON(templateData);
-        this.templates.push(template);
-    }
-    
-    this.uiManager.displayStatus(`${this.templates.length} template(s) carregado(s).`);
-  }
-
-  /**
-   * Salva os templates atuais no armazenamento do Tampermonkey.
-   * @private
-   */
-  async #saveTemplates() {
-    const dataToSave = {
-      whoami: 'Wgram',
-      scriptVersion: this.scriptVersion,
-      schemaVersion: this.schemaVersion,
-      templates: {},
-    };
-
-    for (const template of this.templates) {
-      dataToSave.templates[template.id] = template.toJSON();
+    setUserId(id) {
+        this.userId = id;
     }
 
-    await GM.setValue('wgramTemplates', JSON.stringify(dataToSave));
-    console.log('[Wgram] Templates salvos com sucesso.');
-  }
+    async loadProjectFromFirestore(projectId) {
+        this.uiManager.displayStatus(`A procurar projeto ${projectId}...`);
+        try {
+            const docRef = this.authManager.db.collection('publicProjects').doc(projectId);
+            const doc = await docRef.get();
 
-  /**
-   * Cria um novo template, processa e o salva.
-   * @param {File} file - O arquivo de imagem do template.
-   * @param {string} name - O nome do template.
-   * @param {number[]} coords - As coordenadas [tx, ty, px, py].
-   */
-  async createTemplate(file, name, coords) {
-    this.uiManager.displayStatus(`Processando "${name}"...`);
-    
-    try {
-      const authorId = this.userId ? numberToEncoded(this.userId, ENCODING_BASE) : 'anon';
-      const template = new Template({
-        displayName: name,
-        authorId: authorId,
-        coords: coords,
-      });
+            if (!doc.exists) {
+                return this.uiManager.displayError("Projeto público não encontrado com este ID.");
+            }
 
-      await template.processImage(file);
-      
-      // Substitui todos os templates antigos pelo novo (lógica de template único)
-      this.templates = [template];
+            const projectData = doc.data();
+            const { processedImageBase64, name, coordinates } = projectData;
 
-      await this.#saveTemplates();
-      this.uiManager.displayStatus(`Template "${name}" criado com sucesso!`);
-    } catch (error) {
-      this.uiManager.displayError(`Falha ao criar template: ${error.message}`);
-      console.error(error);
-    }
-  }
+            if (!processedImageBase64) {
+                return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template.");
+            }
 
-  /**
-   * Desenha os templates sobre a imagem de um tile recebido.
-   * @param {Blob} tileBlob - O blob da imagem original do tile.
-   * @param {number[]} tileCoords - As coordenadas [x, y] do tile.
-   * @returns {Promise<Blob>} O blob da imagem modificada.
-   */
-  async drawTemplateOnTile(tileBlob, tileCoords) {
-    if (!this.templatesShouldBeDrawn || this.templates.length === 0) {
-      return tileBlob;
-    }
-
-    const tileBitmap = await createImageBitmap(tileBlob);
-    const canvas = new OffscreenCanvas(tileBitmap.width, tileBitmap.height);
-    const ctx = canvas.getContext('2d');
-    
-    // Desenha a imagem original do tile primeiro
-    ctx.drawImage(tileBitmap, 0, 0);
-
-    // Encontra e desenha cada template que se sobrepõe a este tile
-    for (const template of this.templates) {
-      const chunk = template.getChunkForTile(tileCoords);
-      if (chunk) {
-        ctx.drawImage(chunk.bitmap, chunk.drawX, chunk.drawY);
-      }
+            if (coordinates && coordinates.tl_x !== undefined) {
+                this.uiManager.toggleCoordsFields(false);
+                const coordsArray = [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number);
+                await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
+            } else {
+                this.uiManager.displayError("Projeto não tem coordenadas. Por favor, insira-as.");
+                this.uiManager.toggleCoordsFields(true);
+                // Adiciona um listener temporário ao botão para usar as coordenadas manuais
+                const loadBtn = document.getElementById('wgram-btn-load');
+                const tempListener = async () => {
+                    const tx = document.getElementById('wgram-input-tx').value;
+                    const ty = document.getElementById('wgram-input-ty').value;
+                    const px = document.getElementById('wgram-input-px').value;
+                    const py = document.getElementById('wgram-input-py').value;
+                    if (!tx || !ty || !px || !py) {
+                        return this.uiManager.displayError('Coordenadas incompletas.');
+                    }
+                    const coordsArray = [tx, ty, px, py].map(Number);
+                    await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
+                    loadBtn.removeEventListener('click', tempListener); // Remove o listener para não acumular
+                };
+                loadBtn.addEventListener('click', tempListener);
+            }
+        } catch (error) {
+            this.uiManager.displayError("Erro ao comunicar com a base de dados.");
+            console.error(error);
+        }
     }
 
-    return await canvas.convertToBlob({ type: 'image/png' });
-  }
+    async createTemplateFromBase64(base64, name, coords) {
+        this.uiManager.displayStatus(`A processar o template "${name}"...`);
+        try {
+            const template = new Template({ displayName: name, coords: coords });
+            await template.processImage(base64);
+            this.templates = [template]; // Substitui o template atual pelo novo
+            this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`);
+            this.setTemplatesShouldBeDrawn(true);
+        } catch (error) {
+            this.uiManager.displayError(`Falha ao processar o template: ${error.message}`);
+            console.error(error);
+        }
+    }
 
-  /**
-   * Ativa ou desativa a renderização de todos os templates.
-   * @param {boolean} shouldDraw - True para ativar, false para desativar.
-   */
-  setTemplatesShouldBeDrawn(shouldDraw) {
-    this.templatesShouldBeDrawn = shouldDraw;
-    this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`);
-  }
+    async drawTemplateOnTile(tileBlob, tileCoords) {
+        if (!this.templatesShouldBeDrawn || this.templates.length === 0) {
+            return tileBlob;
+        }
+        const RENDER_SCALE = 3;
+        const tileBitmap = await createImageBitmap(tileBlob);
+        const scaledWidth = tileBitmap.width * RENDER_SCALE;
+        const scaledHeight = tileBitmap.height * RENDER_SCALE;
+        const canvas = new OffscreenCanvas(scaledWidth, scaledHeight);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight);
+        for (const template of this.templates) {
+            const chunk = template.getChunkForTile(tileCoords);
+            if (chunk) {
+                ctx.drawImage(chunk.bitmap, 0, 0);
+            }
+        }
+        return await canvas.convertToBlob({ type: 'image/png' });
+    }
+
+    setTemplatesShouldBeDrawn(shouldDraw) {
+        this.templatesShouldBeDrawn = shouldDraw;
+        this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`);
+    }
 }
