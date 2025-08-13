@@ -22,7 +22,7 @@
 
 ## 🚀 Sobre o Projeto
 
-Bem-vindo ao **Wgram**, o script complementar para a aplicação web [WGram - Gerador de Pixel Art](https://wgram.discloud.app). Este script foi projetado para integrar perfeitamente a sua experiência no Wplace, permitindo que carregue templates de pixel art diretamente no jogo a partir de projetos criados ou partilhados na nossa plataforma.
+Bem-vindo ao **Wgram**, o script acomplementar para a aplicação web [WGram - Gerador de Pixel Art](https://wgram.discloud.app). Este script foi projetado para integrar perfeitamente a sua experiência no Wplace, permitindo que carregue templates de pixel art diretamente no jogo a partir de projetos criados ou partilhados na nossa plataforma.
 
 Chega de converter e carregar ficheiros manualmente. Com o Wgram, basta um ID de projeto para começar a sua obra de arte!
 

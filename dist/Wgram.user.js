@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.6.0
+// @version      1.6.1
 // @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -65,7 +65,7 @@
     getChunkForTile(tileCoords) { const tileKey = `${tileCoords[0]},${tileCoords[1]}`; const chunk = this.chunks[tileKey]; if (chunk && chunk.bitmap) { return { bitmap: chunk.bitmap, drawX: 0, drawY: 0 }; } return null; }
   }
 
-  // --- Módulo: src/components/UIManager.js (MODIFICADO) ---
+  // --- Módulo: src/components/UIManager.js ---
   class UIManager {
     constructor(name, version) { this.name = name; this.version = version; this.authManager = null; this.apiManager = null; this.templateManager = null; this.overlayBuilder = new Overlay(); this.isMinimized = false; this.outputStatusId = 'wgram-output-status'; }
     updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
@@ -174,7 +174,7 @@
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
 
-  // --- Módulo: src/core/AuthManager.js (MODIFICADO) ---
+  // --- Módulo: src/core/AuthManager.js (CORRIGIDO) ---
   class AuthManager {
       constructor(config, uiManager) { this.uiManager = uiManager; try { this.firebaseApp = firebase.initializeApp(config); this.auth = firebase.auth(); this.db = firebase.firestore(); } catch (e) { console.error("Erro ao inicializar o Firebase.", e); alert("Falha ao conectar com o Firebase."); } }
       onAuthStateChanged(callback) { this.auth.onAuthStateChanged(callback); }
@@ -190,7 +190,7 @@
           
           try {
               const userDoc = await userDocRef.get();
-              const wplaceUsername = userDoc.exists() ? userDoc.data().wplaceUsername : 'Desconhecido';
+              const wplaceUsername = userDoc.exists ? userDoc.data().wplaceUsername : 'Desconhecido';
 
               const coordsData = {
                   coords: {
@@ -215,7 +215,7 @@
       }
   }
 
-  // --- Módulo: src/core/TemplateManager.js (MODIFICADO) ---
+  // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
@@ -223,7 +223,6 @@
         this.uiManager.displayStatus(`A procurar ID ${id}...`);
         this.uiManager.hideInfoAndCoords();
 
-        // Tenta primeiro como um ID de projeto
         const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
         const projectDoc = await projectDocRef.get();
 
@@ -232,7 +231,6 @@
             return;
         }
 
-        // Se não for um projeto, tenta como um ID de coordenadas
         const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
         const coordsDoc = await coordsDocRef.get();
 
