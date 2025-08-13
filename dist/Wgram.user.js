@@ -16,6 +16,7 @@
 // @grant        GM.setValue
 // @grant        GM_getValue
 
+
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js

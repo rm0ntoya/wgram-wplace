@@ -19,6 +19,7 @@
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js
 
 // @run-at       document-end
 
