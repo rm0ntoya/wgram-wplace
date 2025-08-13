@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.0.2
+// @version      1.0.3
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live. Use em conformidade com os Termos de Serviço do site.
 // @author       rm0ntoya
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
-// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png
+// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png
 
 // @match        *://*.wplace.live/*
 
@@ -82,7 +82,7 @@
     displayStatus(text) { console.info(`[${this.name}] Status: ${text}`); this.updateElement(this.outputStatusId, `Status: ${text}`, true); }
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
-    buildMainOverlay() { this.overlayBuilder.addDiv({ id: 'wgram-overlay' }).addDiv({ id: 'wgram-header' }).addDiv({ id: 'wgram-drag-handle' }).buildElement().addImg({ alt: 'Ícone do Wgram - Clique para minimizar/maximizar', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (overlay, img) => { img.addEventListener('click', () => this.#toggleMinimize()); }).buildElement().addHeader(1, { textContent: this.name }).buildElement().buildElement().addHr().buildElement().addDiv({ id: 'wgram-user-info' }).addP({ id: 'wgram-user-name', innerHTML: 'Usuário: <b>Carregando...</b>' }).buildElement().addP({ id: 'wgram-user-droplets', innerHTML: 'Gotas: <b>Carregando...</b>' }).buildElement().buildElement().addHr().buildElement().addDiv({ id: 'wgram-template-controls' }).addDiv({ id: 'wgram-coords-container' }).addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement().addInput({ type: 'number', id: 'wgram-input-ty', placeholder: 'Tl Y' }).buildElement().addInput({ type: 'number', id: 'wgram-input-px', placeholder: 'Px X' }).buildElement().addInput({ type: 'number', id: 'wgram-input-py', placeholder: 'Px Y' }).buildElement().buildElement().addInputFile({ id: 'wgram-input-file', textContent: 'Carregar Template' }).buildElement().addDiv({ id: 'wgram-template-buttons' }).addButton({ id: 'wgram-btn-create', textContent: 'Criar' }, (overlay, btn) => { btn.onclick = () => this.#handleCreateTemplate(); }).buildElement().addButton({ id: 'wgram-btn-enable', textContent: 'Ativar' }, (overlay, btn) => { btn.onclick = () => this.templateManager.setTemplatesShouldBeDrawn(true); }).buildElement().addButton({ id: 'wgram-btn-disable', textContent: 'Desativar' }, (overlay, btn) => { btn.onclick = () => this.templateManager.setTemplatesShouldBeDrawn(false); }).buildElement().buildElement().buildElement().addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement().buildElement().buildOverlay(document.body); this.handleDrag('wgram-overlay', 'wgram-drag-handle'); }
+    buildMainOverlay() { this.overlayBuilder.addDiv({ id: 'wgram-overlay' }).addDiv({ id: 'wgram-header' }).addDiv({ id: 'wgram-drag-handle' }).buildElement().addImg({ alt: 'Ícone do Wgram - Clique para minimizar/maximizar', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png', style: 'cursor: pointer;' }, (overlay, img) => { img.addEventListener('click', () => this.#toggleMinimize()); }).buildElement().addHeader(1, { textContent: this.name }).buildElement().buildElement().addHr().buildElement().addDiv({ id: 'wgram-user-info' }).addP({ id: 'wgram-user-name', innerHTML: 'Usuário: <b>Carregando...</b>' }).buildElement().addP({ id: 'wgram-user-droplets', innerHTML: 'Gotas: <b>Carregando...</b>' }).buildElement().buildElement().addHr().buildElement().addDiv({ id: 'wgram-template-controls' }).addDiv({ id: 'wgram-coords-container' }).addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement().addInput({ type: 'number', id: 'wgram-input-ty', placeholder: 'Tl Y' }).buildElement().addInput({ type: 'number', id: 'wgram-input-px', placeholder: 'Px X' }).buildElement().addInput({ type: 'number', id: 'wgram-input-py', placeholder: 'Px Y' }).buildElement().buildElement().addInputFile({ id: 'wgram-input-file', textContent: 'Carregar Template' }).buildElement().addDiv({ id: 'wgram-template-buttons' }).addButton({ id: 'wgram-btn-create', textContent: 'Criar' }, (overlay, btn) => { btn.onclick = () => this.#handleCreateTemplate(); }).buildElement().addButton({ id: 'wgram-btn-enable', textContent: 'Ativar' }, (overlay, btn) => { btn.onclick = () => this.templateManager.setTemplatesShouldBeDrawn(true); }).buildElement().addButton({ id: 'wgram-btn-disable', textContent: 'Desativar' }, (overlay, btn) => { btn.onclick = () => this.templateManager.setTemplatesShouldBeDrawn(false); }).buildElement().buildElement().buildElement().addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement().buildElement().buildOverlay(document.body); this.handleDrag('wgram-overlay', 'wgram-drag-handle'); }
     #handleCreateTemplate() { const fileInput = document.getElementById('wgram-input-file'); const tx = document.getElementById('wgram-input-tx').value; const ty = document.getElementById('wgram-input-ty').value; const px = document.getElementById('wgram-input-px').value; const py = document.getElementById('wgram-input-py').value; if (!fileInput.files || fileInput.files.length === 0) { return this.displayError('Nenhum arquivo de template selecionado.'); } if (!tx || !ty || !px || !py) { return this.displayError('Coordenadas incompletas. Clique na tela primeiro.'); } const file = fileInput.files[0]; const coords = [Number(tx), Number(ty), Number(px), Number(py)]; const name = file.name.replace(/\.[^/.]+$/, ''); this.templateManager.createTemplate(file, name, coords); }
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
@@ -98,52 +98,83 @@
     setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
   }
 
-  // --- Módulo: src/core/ApiManager.js ---
+  // --- Módulo: src/core/ApiManager.js (CORRIGIDO) ---
   class ApiManager {
     constructor(templateManager, uiManager) { this.templateManager = templateManager; this.uiManager = uiManager; this.disableAll = false; this.coordsTilePixel = []; }
-    initializeApiListener() { window.addEventListener('message', async (event) => { const { data } = event; if (!data || data.source !== 'wgram-script') { return; } const endpoint = this.#parseEndpoint(data.endpoint); if (endpoint === 'tiles') { await this.#handleTileResponse(data); return; } if (data.jsonData) { this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint); } }); }
+    initializeApiListener() {
+        window.addEventListener('message', async (event) => {
+            const { data } = event;
+            // Ignora mensagens que não são do nosso espião de rede
+            if (!data || data.source !== 'wgram-spy') {
+                return;
+            }
+            const endpoint = this.#parseEndpoint(data.endpoint);
+            if (endpoint === 'tiles') {
+                await this.#handleTileResponse(data);
+                return;
+            }
+            if (data.jsonData) {
+                this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint);
+            }
+        });
+    }
     #parseEndpoint(url) { if (!url) return ''; return url.split('?')[0].split('/').filter(s => s && isNaN(Number(s)) && !s.includes('.')).pop() || ''; }
     #handleJsonResponse(endpoint, jsonData, fullUrl) { switch (endpoint) { case 'me': this.#processUserData(jsonData); break; case 'pixel': this.#processPixelCoords(fullUrl); break; case 'robots': this.disableAll = jsonData.userscript?.toString().toLowerCase() === 'false'; if (this.disableAll) { this.uiManager.displayError("O script foi desativado pelo proprietário do site."); } break; } }
     #processUserData(data) { if (data.status && String(data.status).startsWith('2') === false) { this.uiManager.displayError("Falha ao buscar dados do usuário. Verifique se está logado."); return; } this.templateManager.setUserId(data.id); this.uiManager.updateElement('wgram-user-name', `Usuário: <b>${escapeHTML(data.name)}</b>`); this.uiManager.updateElement('wgram-user-droplets', `Gotas: <b>${new Intl.NumberFormat().format(data.droplets)}</b>`); }
     #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { this.uiManager.displayError("Coordenadas recebidas são inválidas."); return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); this.uiManager.updateElement('wgram-input-tx', this.coordsTilePixel[0]); this.uiManager.updateElement('wgram-input-ty', this.coordsTilePixel[1]); this.uiManager.updateElement('wgram-input-px', this.coordsTilePixel[2]); this.uiManager.updateElement('wgram-input-py', this.coordsTilePixel[3]); }
-    async #handleTileResponse(data) { let tileCoords = data.endpoint.split('/'); tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; const { blobID, blobData, blink } = data; const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords); window.postMessage({ source: 'wgram-script', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*'); }
+    async #handleTileResponse(data) {
+        let tileCoords = data.endpoint.split('/');
+        tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)];
+        const { blobID, blobData, blink } = data;
+        const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords);
+        // Envia a imagem modificada de volta para o espião na página
+        window.postMessage({ source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*');
+    }
   }
 
   // --- Módulo: src/core/Injector.js (CORRIGIDO) ---
   class Injector {
-    injectFetchSpy(scriptName) {
-        const spyFunction = function(scriptName) {
+    injectFetchSpy() {
+        const spyFunction = function() {
+            const SCRIPT_NAME = 'Wgram'; // Nome definido diretamente aqui
+            const SPY_SOURCE = 'wgram-spy'; // Fonte das mensagens enviadas por este espião
+            const MAIN_SOURCE = 'wgram-main'; // Fonte das mensagens esperadas do script principal
+
             const originalFetch = window.fetch;
             const fetchedBlobQueue = new Map();
+
             window.addEventListener('message', (event) => {
                 const { source, blobID, blobData } = event.data;
-                if (source !== scriptName || !blobID || !blobData) { return; }
+                if (source !== MAIN_SOURCE || !blobID || !blobData) { return; }
                 const resolveCallback = fetchedBlobQueue.get(blobID);
                 if (typeof resolveCallback === 'function') {
                     resolveCallback(blobData);
                     fetchedBlobQueue.delete(blobID);
                 }
             });
+
             window.fetch = async function(...args) {
                 const response = await originalFetch.apply(this, args);
                 const clonedResponse = response.clone();
-                const url = (args[0] instanceof Request) ? args[0].url : args[0] || '';
+                const url = (args[0] instanceof Request) ? args[0].url : (args[0] || '');
                 const contentType = clonedResponse.headers.get('content-type') || '';
+
                 if (contentType.includes('application/json')) {
-                    clonedResponse.json().then(jsonData => { window.postMessage({ source: `${scriptName}-script`, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${scriptName}] Erro ao processar JSON:`, err); });
+                    clonedResponse.json().then(jsonData => { window.postMessage({ source: SPY_SOURCE, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${SCRIPT_NAME}] Erro ao processar JSON:`, err); });
                 } else if (contentType.includes('image/') && !url.includes('openfreemap') && !url.includes('maps')) {
                     const blob = await clonedResponse.blob();
                     return new Promise((resolve) => {
                         const blobUUID = crypto.randomUUID();
                         fetchedBlobQueue.set(blobUUID, (processedBlob) => { resolve(new Response(processedBlob, { headers: clonedResponse.headers, status: clonedResponse.status, statusText: clonedResponse.statusText })); });
-                        window.postMessage({ source: `${scriptName}-script`, endpoint: url, blobID: blobUUID, blobData: blob, blink: Date.now() }, '*');
+                        window.postMessage({ source: SPY_SOURCE, endpoint: url, blobID: blobUUID, blobData: blob, blink: Date.now() }, '*');
                     });
                 }
                 return response;
             };
         };
+
         const script = document.createElement('script');
-        script.textContent = `(${spyFunction.toString()})('${scriptName}');`;
+        script.textContent = `(${spyFunction.toString()})();`;
         document.documentElement.appendChild(script);
         script.remove();
     }
@@ -152,8 +183,8 @@
   // --- Módulo: src/main.js ---
   class WgramScript {
     constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.templateManager = this.templateManager; this.uiManager.apiManager = this.apiManager; }
-    async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.injector.injectFetchSpy(this.info.name); this.apiManager.initializeApiListener(); await this.templateManager.loadTemplates(); this.uiManager.buildMainOverlay(); console.log(`[${this.info.name}] Carregado com sucesso!`); }
-    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.name}] Falha ao injetar CSS:`, error); } }
+    async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.injector.injectFetchSpy(); this.apiManager.initializeApiListener(); await this.templateManager.loadTemplates(); this.uiManager.buildMainOverlay(); console.log(`[${this.info.name}] Carregado com sucesso!`); }
+    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
   }
 
   const wgram = new WgramScript();
