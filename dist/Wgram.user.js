@@ -262,48 +262,42 @@ async saveAndCopyCoordsId(coords) {
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
-async loadItemFromFirestore(id) {
+    async loadItemFromFirestore(id) {
         this.uiManager.displayStatus(`A procurar ID ${id}...`);
         this.uiManager.hideInfoAndCoords();
 
-        // 1. Unifica a busca. Primeiro tenta em 'publicProjects'.
         const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
         let docSnap = await projectDocRef.get();
 
-        // 2. Se não encontrar, tenta em 'sharedCoords'.
         if (!docSnap.exists()) {
             const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
             docSnap = await coordsDocRef.get();
         }
 
-        // 3. Se não encontrou em nenhum lugar, exibe o erro.
         if (!docSnap.exists()) {
             return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
         }
 
         const data = docSnap.data();
 
-        // 4. --- LÓGICA DE REDIRECIONAMENTO ---
-        // Verifica se existe uma URL e se é diferente da URL atual (para evitar loops).
+        // --- INÍCIO DO DEBUG ---
+        console.log("------------------- DEBUG WGRAM -------------------");
+        console.log("URL do Projeto no Firestore:", data.locationUrl);
+        console.log("URL Atual da Página:", window.location.href.split('#')[0]);
+        console.log("Condição do Redirecionamento:", data.locationUrl && data.locationUrl !== window.location.href.split('#')[0]);
+        console.log("-------------------------------------------------");
+        // --- FIM DO DEBUG ---
+
         if (data.locationUrl && data.locationUrl !== window.location.href.split('#')[0]) {
             this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
-            
-            // Salva a "intenção" de carregar o ID no sessionStorage.
             sessionStorage.setItem('wgram_pending_load', id);
-            
-            // Redireciona a página.
             window.location.href = data.locationUrl;
-            
-            // Para a execução do script aqui, pois a página será recarregada.
             return; 
         }
 
-        // 5. Se não precisou redirecionar, continua o carregamento normal.
-        // Verifica se tem uma imagem para carregar (é um projeto completo).
         if (data.processedImageBase64) {
             await this.loadProject(docSnap);
         } 
-        // Se não, verifica se tem coordenadas (é apenas um compartilhamento de local).
         else if (data.coords) {
             await this.loadCoords(docSnap);
         }
