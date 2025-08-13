@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.0.4
+// @version      1.0.5
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live. Use em conformidade com os Termos de Serviço do site.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -87,18 +87,40 @@
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
 
-  // --- Módulo: src/core/TemplateManager.js ---
+  // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.schemaVersion = '1.0.0'; this.uiManager = uiManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
     async loadTemplates() { const savedData = JSON.parse(await GM.getValue('wgramTemplates', '{}')); if (!savedData.templates || savedData.whoami !== 'Wgram') { console.log('[Wgram] Nenhum template salvo encontrado ou formato inválido.'); return; } this.templates = []; for (const templateData of Object.values(savedData.templates)) { const template = await Template.fromJSON(templateData); this.templates.push(template); } this.uiManager.displayStatus(`${this.templates.length} template(s) carregado(s).`); }
     async #saveTemplates() { const dataToSave = { whoami: 'Wgram', scriptVersion: this.scriptVersion, schemaVersion: this.schemaVersion, templates: {} }; for (const template of this.templates) { dataToSave.templates[template.id] = template.toJSON(); } await GM.setValue('wgramTemplates', JSON.stringify(dataToSave)); console.log('[Wgram] Templates salvos com sucesso.'); }
     async createTemplate(file, name, coords) { this.uiManager.displayStatus(`Processando "${name}"...`); try { const authorId = this.userId ? numberToEncoded(this.userId, ENCODING_BASE) : 'anon'; const template = new Template({ displayName: name, authorId: authorId, coords: coords }); await template.processImage(file); this.templates = [template]; await this.#saveTemplates(); this.uiManager.displayStatus(`Template "${name}" criado com sucesso!`); } catch (error) { this.uiManager.displayError(`Falha ao criar template: ${error.message}`); console.error(error); } }
-    async drawTemplateOnTile(tileBlob, tileCoords) { if (!this.templatesShouldBeDrawn || this.templates.length === 0) { return tileBlob; } const tileBitmap = await createImageBitmap(tileBlob); const canvas = new OffscreenCanvas(tileBitmap.width, tileBitmap.height); const ctx = canvas.getContext('2d'); ctx.drawImage(tileBitmap, 0, 0); for (const template of this.templates) { const chunk = template.getChunkForTile(tileCoords); if (chunk) { ctx.drawImage(chunk.bitmap, chunk.drawX, chunk.drawY); } } return await canvas.convertToBlob({ type: 'image/png' }); }
-    setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
+    async drawTemplateOnTile(tileBlob, tileCoords) {
+        if (!this.templatesShouldBeDrawn || this.templates.length === 0) {
+            return tileBlob;
+        }
+        const RENDER_SCALE = 3;
+        const tileBitmap = await createImageBitmap(tileBlob);
+        const scaledWidth = tileBitmap.width * RENDER_SCALE;
+        const scaledHeight = tileBitmap.height * RENDER_SCALE;
+        const canvas = new OffscreenCanvas(scaledWidth, scaledHeight);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight);
+        for (const template of this.templates) {
+            const chunk = template.getChunkForTile(tileCoords);
+            if (chunk) {
+                ctx.drawImage(chunk.bitmap, 0, 0);
+            }
+        }
+        return await canvas.convertToBlob({ type: 'image/png' });
+    }
+    setTemplatesShouldBeDrawn(shouldDraw) {
+        this.templatesShouldBeDrawn = shouldDraw;
+        this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`);
+    }
   }
 
-  // --- Módulo: src/core/ApiManager.js (CORRIGIDO) ---
+  // --- Módulo: src/core/ApiManager.js ---
   class ApiManager {
     constructor(templateManager, uiManager) { this.templateManager = templateManager; this.uiManager = uiManager; this.disableAll = false; this.coordsTilePixel = []; }
     initializeApiListener() {
@@ -130,7 +152,7 @@
     }
   }
 
-  // --- Módulo: src/core/Injector.js (CORRIGIDO) ---
+  // --- Módulo: src/core/Injector.js ---
   class Injector {
     injectFetchSpy() {
         const spyFunction = function() {
@@ -182,7 +204,7 @@
   class WgramScript {
     constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.templateManager = this.templateManager; this.uiManager.apiManager = this.apiManager; }
     async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.injector.injectFetchSpy(); this.apiManager.initializeApiListener(); await this.templateManager.loadTemplates(); this.uiManager.buildMainOverlay(); console.log(`[${this.info.name}] Carregado com sucesso!`); }
-    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
+    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
   }
 
   const wgram = new WgramScript();
