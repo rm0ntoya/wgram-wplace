@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.0.3
+// @version      1.0.4
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live. Use em conformidade com os Termos de Serviço do site.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -104,8 +104,7 @@
     initializeApiListener() {
         window.addEventListener('message', async (event) => {
             const { data } = event;
-            // Ignora mensagens que não são do nosso espião de rede
-            if (!data || data.source !== 'wgram-spy') {
+            if (!data || !data.isWgramMessage || data.source !== 'wgram-spy') {
                 return;
             }
             const endpoint = this.#parseEndpoint(data.endpoint);
@@ -127,8 +126,7 @@
         tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)];
         const { blobID, blobData, blink } = data;
         const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords);
-        // Envia a imagem modificada de volta para o espião na página
-        window.postMessage({ source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*');
+        window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*');
     }
   }
 
@@ -136,20 +134,20 @@
   class Injector {
     injectFetchSpy() {
         const spyFunction = function() {
-            const SCRIPT_NAME = 'Wgram'; // Nome definido diretamente aqui
-            const SPY_SOURCE = 'wgram-spy'; // Fonte das mensagens enviadas por este espião
-            const MAIN_SOURCE = 'wgram-main'; // Fonte das mensagens esperadas do script principal
+            const SCRIPT_NAME = 'Wgram';
+            const SPY_SOURCE = 'wgram-spy';
+            const MAIN_SOURCE = 'wgram-main';
 
             const originalFetch = window.fetch;
             const fetchedBlobQueue = new Map();
 
             window.addEventListener('message', (event) => {
-                const { source, blobID, blobData } = event.data;
-                if (source !== MAIN_SOURCE || !blobID || !blobData) { return; }
-                const resolveCallback = fetchedBlobQueue.get(blobID);
+                const { data } = event;
+                if (!data || !data.isWgramMessage || data.source !== MAIN_SOURCE) { return; }
+                const resolveCallback = fetchedBlobQueue.get(data.blobID);
                 if (typeof resolveCallback === 'function') {
-                    resolveCallback(blobData);
-                    fetchedBlobQueue.delete(blobID);
+                    resolveCallback(data.blobData);
+                    fetchedBlobQueue.delete(data.blobID);
                 }
             });
 
@@ -160,13 +158,13 @@
                 const contentType = clonedResponse.headers.get('content-type') || '';
 
                 if (contentType.includes('application/json')) {
-                    clonedResponse.json().then(jsonData => { window.postMessage({ source: SPY_SOURCE, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${SCRIPT_NAME}] Erro ao processar JSON:`, err); });
+                    clonedResponse.json().then(jsonData => { window.postMessage({ isWgramMessage: true, source: SPY_SOURCE, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${SCRIPT_NAME}] Erro ao processar JSON:`, err); });
                 } else if (contentType.includes('image/') && !url.includes('openfreemap') && !url.includes('maps')) {
                     const blob = await clonedResponse.blob();
                     return new Promise((resolve) => {
                         const blobUUID = crypto.randomUUID();
                         fetchedBlobQueue.set(blobUUID, (processedBlob) => { resolve(new Response(processedBlob, { headers: clonedResponse.headers, status: clonedResponse.status, statusText: clonedResponse.statusText })); });
-                        window.postMessage({ source: SPY_SOURCE, endpoint: url, blobID: blobUUID, blobData: blob, blink: Date.now() }, '*');
+                        window.postMessage({ isWgramMessage: true, source: SPY_SOURCE, endpoint: url, blobID: blobUUID, blobData: blob, blink: Date.now() }, '*');
                     });
                 }
                 return response;
@@ -184,7 +182,7 @@
   class WgramScript {
     constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.templateManager = this.templateManager; this.uiManager.apiManager = this.apiManager; }
     async start() { console.log(`[${this.info.name}] v${this.info.version} a iniciar...`); this.injectCSS(); this.injector.injectFetchSpy(); this.apiManager.initializeApiListener(); await this.templateManager.loadTemplates(); this.uiManager.buildMainOverlay(); console.log(`[${this.info.name}] Carregado com sucesso!`); }
-    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
+    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
   }
 
   const wgram = new WgramScript();
