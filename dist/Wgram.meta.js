@@ -7,7 +7,7 @@
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js  // TODO: Mude para o link do seu repositório no GitHub
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /issues // TODO: (Opcional) Mude para o seu link de suporte (página de Issues, Discord, etc.)
-// @icon         https://raw.githubusercontent.com/SeuUsuario/Wgram/main/assets/icon.png // TODO: Mude para o link do ícone do seu projeto
+// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png // TODO: Mude para o link do ícone do seu projeto
 
 // @match        *://*.wplace.live/*
 

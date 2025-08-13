@@ -111,7 +111,7 @@ export default class UIManager {
           .addDiv({ id: 'wgram-drag-handle' }).buildElement()
           .addImg({
             alt: 'Ícone do Wgram - Clique para minimizar/maximizar',
-            src: 'https://raw.githubusercontent.com/SeuUsuario/Wgram/main/assets/icon.png', // TODO: Mudar para o seu URL de ícone
+            src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', // TODO: Mudar para o seu URL de ícone
             style: 'cursor: pointer;',
           }, (overlay, img) => {
             img.addEventListener('click', () => this.#toggleMinimize());

@@ -7,7 +7,7 @@
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js  // TODO: Mude para o link do seu repositório no GitHub
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /issues // TODO: (Opcional) Mude para o seu link de suporte (página de Issues, Discord, etc.)
-// @icon         https://raw.githubusercontent.com/SeuUsuario/Wgram/main/assets/icon.png // TODO: Mude para o link do ícone do seu projeto
+// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png // TODO: Mude para o link do ícone do seu projeto
 
 // @match        *://*.wplace.live/*
 
@@ -176,7 +176,7 @@
             .addDiv({ id: 'wgram-overlay' })
                 .addDiv({ id: 'wgram-header' })
                     .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                    .addImg({ alt: 'Ícone do Wgram - Clique para minimizar/maximizar', src: 'https://raw.githubusercontent.com/SeuUsuario/Wgram/main/assets/icon.png', style: 'cursor: pointer;' }, (overlay, img) => { img.addEventListener('click', () => this.#toggleMinimize()); }).buildElement()
+                    .addImg({ alt: 'Ícone do Wgram - Clique para minimizar/maximizar', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (overlay, img) => { img.addEventListener('click', () => this.#toggleMinimize()); }).buildElement()
                     .addHeader(1, { textContent: this.name }).buildElement()
                 .buildElement()
                 .addHr().buildElement()
