@@ -263,6 +263,7 @@ async saveAndCopyCoordsId(coords) {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
 // Wgram.user.js - VERSÃO FINAL CORRIGIDA
+// Wgram.user.js - VERSÃO FINAL COM A SINTAXE CORRIGIDA
 async loadItemFromFirestore(id) {
     this.uiManager.displayStatus(`A procurar ID ${id}...`);
     this.uiManager.hideInfoAndCoords();
@@ -270,36 +271,30 @@ async loadItemFromFirestore(id) {
     const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
     let docSnap = await projectDocRef.get();
 
-    if (!docSnap.exists()) {
+    // CORREÇÃO 1: Removido os parênteses de .exists()
+    if (!docSnap.exists) {
         const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
         docSnap = await coordsDocRef.get();
     }
 
-    if (!docSnap.exists()) {
+    // CORREÇÃO 2: Removido os parênteses de .exists()
+    if (!docSnap.exists) {
         return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
     }
 
     const data = docSnap.data();
 
-    // --- INÍCIO DA CORREÇÃO ---
-    
-    // 1. Busca a URL no caminho correto: DENTRO de 'coordinates'.
-    //    Adicionamos uma verificação para garantir que 'coordinates' existe.
     const redirectUrl = data.coordinates ? data.coordinates.url : null;
 
-    // 2. Compara a 'redirectUrl' encontrada com a URL atual.
     if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
         this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
         
         sessionStorage.setItem('wgram_pending_load', id);
         
-        // 3. Usa a 'redirectUrl' correta para redirecionar.
         window.location.href = redirectUrl;
         
         return; 
     }
-
-    // --- FIM DA CORREÇÃO ---
 
     if (data.processedImageBase64) {
         await this.loadProject(docSnap);
