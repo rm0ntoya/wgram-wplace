@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Wgram
-// @namespace    https://github.com/SeuUsuario // TODO: Mude para o seu namespace (seu perfil do GitHub, por exemplo)
-// @version      1.0.0
-// @description  Um script de usuário para aprimorar a experiência no Wplace.live. Use em conformidade com os Termos de Serviço do site.
-// @author       Seu Nome Aqui // TODO: Coloque seu nome ou nome de usuário
+// @namespace    https://github.com/rm0ntoya
+// @version      1.1.1
+// @description  Um script de usuário para aprimorar a experiência no Wplace.live com login e salvamento na nuvem.
+// @author       rm0ntoya
 // @license      MPL-2.0
-// @homepageURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js  // TODO: Mude para o link do seu repositório no GitHub
-// @supportURL   https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /issues // TODO: (Opcional) Mude para o seu link de suporte (página de Issues, Discord, etc.)
-// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png // TODO: Mude para o link do ícone do seu projeto
+// @homepageURL  https://github.com/rm0ntoya/wgram-wplace
+// @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
+// @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/icon.png
 
 // @match        *://*.wplace.live/*
 
@@ -16,9 +16,13 @@
 // @grant        GM.setValue
 // @grant        GM_getValue
 
-// @run-at       document-start
+// @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js
+// @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js
+// @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js
 
-// @resource     WGRAM_CSS https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/style.css // TODO: Mude para o link RAW do seu CSS no GitHub
-// @updateURL    https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/Wgram.meta.js // ATENÇÃO: Este link aponta para si mesmo para checagem de versão.
-// @downloadURL  https://github.com/rm0ntoya/wgram-wplace/raw/main/dist/Wgram.user.js /raw/main/dist/Wgram.user.js // TODO: Mude para o link RAW do seu script principal no GitHub
+// @run-at       document-end
+
+// @resource     WGRAM_CSS https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/style.css
+// @updateURL    https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/Wgram.meta.js
+// @downloadURL  https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/main/dist/Wgram.user.js
 // ==/UserScript==
