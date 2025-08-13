@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.5.0
+// @version      1.5.1
 // @description  Um script de usuário para carregar templates do WGram Gerador de Pixel Art por ID, com info e contagem.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -106,7 +106,7 @@
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto aqui' }).buildElement()
-                .addDiv({ id: 'wgram-project-info' }) // Painel de info, começa escondido
+                .addDiv({ id: 'wgram-project-info' })
                     .addP({ id: 'wgram-info-name' }).buildElement()
                     .addP({ id: 'wgram-info-creator' }).buildElement()
                     .addP({ id: 'wgram-info-pixels' }).buildElement()
@@ -122,6 +122,10 @@
                     .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
                     .buildElement()
                 .buildElement()
+                .addSmall({
+                    id: 'wgram-site-promo',
+                    innerHTML: 'Não tem um ID? Visite <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
+                }).buildElement()
             .buildElement()
             .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
             .addDiv({ id: 'wgram-credits' })
