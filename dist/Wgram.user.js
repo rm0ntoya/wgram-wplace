@@ -144,6 +144,7 @@
     }
     #handleCopyCoordsId() {
         const coords = this.apiManager.getCurrentCoords();
+        alert(coords)
         if (!coords || coords.length < 4) {
             return this.displayError("Clique no mapa primeiro para definir as coordenadas.");
         }
