@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.7.2
-// @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram com captura aprimorada.
+// @version      1.8.0
+// @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram com captura aprimorada e modo manutenção.
 // @author       rm0ntoya
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
@@ -85,6 +85,20 @@
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
+    buildMaintenanceOverlay(message) {
+        this.destroyOverlay('wgram-overlay');
+        this.destroyOverlay('wgram-login-overlay');
+        this.overlayBuilder.addDiv({ id: 'wgram-maintenance-overlay' })
+            .addDiv({ style: 'text-align: center; padding: 20px;' })
+                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px;"></i> Em Manutenção' })
+                .buildElement()
+                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' })
+                .buildElement()
+                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' })
+                .buildElement()
+            .buildElement()
+        .buildOverlay(document.body);
+    }
     buildLoginOverlay() {
         this.destroyOverlay('wgram-overlay');
         this.overlayBuilder.addDiv({ id: 'wgram-login-overlay' })
@@ -155,7 +169,6 @@
         this.templateManager.loadItemFromFirestore(projectId);
     }
     #handleCopyCoordsId() {
-        // Se o usuário clicar enquanto já estamos esperando, cancela a operação.
         if (this.isWaitingForCoords) {
             clearInterval(this.coordCheckInterval);
             this.isWaitingForCoords = false;
@@ -167,14 +180,12 @@
             return;
         }
 
-        // Tenta pegar as coordenadas imediatamente.
         const initialCoords = this.apiManager.getCurrentCoords();
         if (initialCoords && initialCoords.length >= 4) {
             this.authManager.saveAndCopyCoordsId(initialCoords);
             return;
         }
 
-        // Se não houver coordenadas, inicia o processo de espera.
         this.isWaitingForCoords = true;
         this.displayStatus("Aguardando clique no mapa... Clique no botão novamente para cancelar.");
 
@@ -184,14 +195,13 @@
         }
 
         let attempts = 0;
-        const maxAttempts = 60; // 60 tentativas * 500ms = 30 segundos de timeout
+        const maxAttempts = 60; 
 
         this.coordCheckInterval = setInterval(() => {
             const polledCoords = this.apiManager.getCurrentCoords();
             attempts++;
 
             if (polledCoords && polledCoords.length >= 4) {
-                // SUCESSO: Coordenadas encontradas
                 clearInterval(this.coordCheckInterval);
                 this.isWaitingForCoords = false;
                 if (copyBtn) {
@@ -199,7 +209,6 @@
                 }
                 this.authManager.saveAndCopyCoordsId(polledCoords);
             } else if (attempts >= maxAttempts) {
-                // TIMEOUT: Tempo esgotado
                 clearInterval(this.coordCheckInterval);
                 this.isWaitingForCoords = false;
                 this.displayError("Tempo esgotado. Tente clicar no mapa e depois no botão.");
@@ -207,7 +216,6 @@
                     copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
                 }
             }
-            // Se nenhuma das condições acima for atendida, o intervalo continua a verificar.
         }, 500);
     }
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
@@ -242,6 +250,22 @@
       async signUp(email, password) { try { await this.auth.createUserWithEmailAndPassword(email, password); this.uiManager.updateElement('wgram-auth-status', 'Registo bem-sucedido! A entrar...', true); } catch (error) { this.uiManager.updateElement('wgram-auth-status', `Erro no registo: ${error.message}`, true); } }
       async logIn(email, password) { try { await this.auth.signInWithEmailAndPassword(email, password); } catch (error) { this.uiManager.updateElement('wgram-auth-status', `Erro no login: ${error.message}`, true); } }
       async logOut() { await this.auth.signOut(); }
+      async checkMaintenanceMode() {
+        try {
+            const docRef = this.db.collection('config').doc('maintenance');
+            const docSnap = await docRef.get();
+            if (docSnap.exists() && docSnap.data().isActive) {
+                return {
+                    isActive: true,
+                    message: docSnap.data().message || 'O script está temporariamente indisponível.'
+                };
+            }
+            return { isActive: false };
+        } catch (error) {
+            console.error("Wgram: Erro ao verificar modo manutenção.", error);
+            return { isActive: false };
+        }
+      }
 async saveAndCopyCoordsId(coords) {
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
@@ -439,28 +463,35 @@ async loadItemFromFirestore(id) {
     async start() {
         console.log(`[${this.info.name}] v${this.info.version} a iniciar...`);
         this.injectCSS();
-        this.authManager.onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log("Utilizador logado:", user.email);
-                this.uiManager.buildMainOverlay(user);
-                this.templateManager.setUserId(user.uid);
-                this.injector.injectFetchSpy();
-                this.apiManager.initializeApiListener();
+        
+        const maintenanceStatus = await this.authManager.checkMaintenanceMode();
 
-                const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
-                
-                if (pendingLoadId) {
-                    console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
-                    sessionStorage.removeItem('wgram_pending_load');
-                    setTimeout(() => this.templateManager.loadItemFromFirestore(pendingLoadId), 100);
+        if (maintenanceStatus.isActive) {
+            this.uiManager.buildMaintenanceOverlay(maintenanceStatus.message);
+        } else {
+            this.authManager.onAuthStateChanged(async (user) => {
+                if (user) {
+                    console.log("Utilizador logado:", user.email);
+                    this.uiManager.buildMainOverlay(user);
+                    this.templateManager.setUserId(user.uid);
+                    this.injector.injectFetchSpy();
+                    this.apiManager.initializeApiListener();
+
+                    const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
+                    
+                    if (pendingLoadId) {
+                        console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
+                        sessionStorage.removeItem('wgram_pending_load');
+                        setTimeout(() => this.templateManager.loadItemFromFirestore(pendingLoadId), 100);
+                    }
+
+                } else {
+                    console.log("Nenhum utilizador logado.");
+                    this.uiManager.destroyOverlay('wgram-overlay');
+                    this.uiManager.buildLoginOverlay();
                 }
-
-            } else {
-                console.log("Nenhum utilizador logado.");
-                this.uiManager.destroyOverlay('wgram-overlay');
-                this.uiManager.buildLoginOverlay();
-            }
-        });
+            });
+        }
     }
     injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
   }
