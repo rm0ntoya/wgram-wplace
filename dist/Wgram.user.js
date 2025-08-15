@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.0
+// @version      1.8.1
 // @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram com captura aprimorada e modo manutenção.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -76,7 +76,6 @@
         this.overlayBuilder = new Overlay();
         this.isMinimized = false;
         this.outputStatusId = 'wgram-output-status';
-        // Variáveis para o novo sistema de captura de coordenadas
         this.isWaitingForCoords = false;
         this.coordCheckInterval = null;
     }
@@ -254,7 +253,8 @@
         try {
             const docRef = this.db.collection('config').doc('maintenance');
             const docSnap = await docRef.get();
-            if (docSnap.exists() && docSnap.data().isActive) {
+            // CORREÇÃO: Usar .exists em vez de .exists() para a v8 do SDK
+            if (docSnap.exists && docSnap.data().isActive) {
                 return {
                     isActive: true,
                     message: docSnap.data().message || 'O script está temporariamente indisponível.'
