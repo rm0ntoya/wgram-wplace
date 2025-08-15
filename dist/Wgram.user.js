@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      2.9.1
+// @version      1.8.2
 // @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram com captura aprimorada e modo manutenção.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -87,9 +87,12 @@
     buildMaintenanceOverlay(message) {
         this.destroyOverlay('wgram-overlay');
         this.destroyOverlay('wgram-login-overlay');
-        this.overlayBuilder.addDiv({ id: 'wgram-maintenance-overlay' })
-            .addDiv({ style: 'text-align: center; padding: 20px;' })
-                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px;"></i> Em Manutenção' })
+        this.overlayBuilder.addDiv({ 
+            id: 'wgram-maintenance-overlay',
+            style: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #1f2937; color: #d1d5db; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; max-width: 400px; width: 90%; border: 1px solid #374151;`
+        })
+            .addDiv({ style: 'text-align: center;' })
+                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' })
                 .buildElement()
                 .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' })
                 .buildElement()
@@ -253,7 +256,6 @@
         try {
             const docRef = this.db.collection('config').doc('maintenance');
             const docSnap = await docRef.get();
-            // CORREÇÃO: Usar .exists em vez de .exists() para a v8 do SDK
             if (docSnap.exists && docSnap.data().isActive) {
                 return {
                     isActive: true,
