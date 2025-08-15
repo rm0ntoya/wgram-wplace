@@ -2,7 +2,7 @@
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
 // @version      1.7.2
-// @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram.
+// @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram com captura aprimorada.
 // @author       rm0ntoya
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
@@ -67,7 +67,19 @@
 
   // --- Módulo: src/components/UIManager.js ---
   class UIManager {
-    constructor(name, version) { this.name = name; this.version = version; this.authManager = null; this.apiManager = null; this.templateManager = null; this.overlayBuilder = new Overlay(); this.isMinimized = false; this.outputStatusId = 'wgram-output-status'; }
+    constructor(name, version) {
+        this.name = name;
+        this.version = version;
+        this.authManager = null;
+        this.apiManager = null;
+        this.templateManager = null;
+        this.overlayBuilder = new Overlay();
+        this.isMinimized = false;
+        this.outputStatusId = 'wgram-output-status';
+        // Variáveis para o novo sistema de captura de coordenadas
+        this.isWaitingForCoords = false;
+        this.coordCheckInterval = null;
+    }
     updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
     displayStatus(text) { console.info(`[${this.name}] Status: ${text}`); this.updateElement(this.outputStatusId, `Status: ${text}`, true); }
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
@@ -143,12 +155,60 @@
         this.templateManager.loadItemFromFirestore(projectId);
     }
     #handleCopyCoordsId() {
-        const coords = this.apiManager.getCurrentCoords();
-        alert(coords)
-        if (!coords || coords.length < 4) {
-            return this.displayError("Clique no mapa primeiro para definir as coordenadas.");
+        // Se o usuário clicar enquanto já estamos esperando, cancela a operação.
+        if (this.isWaitingForCoords) {
+            clearInterval(this.coordCheckInterval);
+            this.isWaitingForCoords = false;
+            this.displayStatus("Captura de coordenadas cancelada.");
+            const copyBtn = document.getElementById('wgram-btn-copy-coords');
+            if (copyBtn) {
+                copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+            }
+            return;
         }
-        this.authManager.saveAndCopyCoordsId(coords);
+
+        // Tenta pegar as coordenadas imediatamente.
+        const initialCoords = this.apiManager.getCurrentCoords();
+        if (initialCoords && initialCoords.length >= 4) {
+            this.authManager.saveAndCopyCoordsId(initialCoords);
+            return;
+        }
+
+        // Se não houver coordenadas, inicia o processo de espera.
+        this.isWaitingForCoords = true;
+        this.displayStatus("Aguardando clique no mapa... Clique no botão novamente para cancelar.");
+
+        const copyBtn = document.getElementById('wgram-btn-copy-coords');
+        if (copyBtn) {
+            copyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Capturando...';
+        }
+
+        let attempts = 0;
+        const maxAttempts = 60; // 60 tentativas * 500ms = 30 segundos de timeout
+
+        this.coordCheckInterval = setInterval(() => {
+            const polledCoords = this.apiManager.getCurrentCoords();
+            attempts++;
+
+            if (polledCoords && polledCoords.length >= 4) {
+                // SUCESSO: Coordenadas encontradas
+                clearInterval(this.coordCheckInterval);
+                this.isWaitingForCoords = false;
+                if (copyBtn) {
+                    copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                }
+                this.authManager.saveAndCopyCoordsId(polledCoords);
+            } else if (attempts >= maxAttempts) {
+                // TIMEOUT: Tempo esgotado
+                clearInterval(this.coordCheckInterval);
+                this.isWaitingForCoords = false;
+                this.displayError("Tempo esgotado. Tente clicar no mapa e depois no botão.");
+                if (copyBtn) {
+                    copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                }
+            }
+            // Se nenhuma das condições acima for atendida, o intervalo continua a verificar.
+        }, 500);
     }
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
     displayProjectInfo(project) {
@@ -186,38 +246,27 @@ async saveAndCopyCoordsId(coords) {
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
 
-        // --- INÍCIO DAS MODIFICAÇÕES ---
-
-        // 1. Inicializar as variáveis de localização como nulas.
-        //    Isso garante que, se algo falhar, salvaremos um valor nulo em vez de dar erro.
         let locationLat = null;
         let locationLng = null;
         let locationZoom = null;
         let locationUrl = null;
 
         try {
-            // 2. Ler a string JSON do localStorage.
             const locationString = localStorage.getItem('location');
             if (locationString) {
-                // 3. Analisar (parse) a string JSON para um objeto.
                 const locationData = JSON.parse(locationString);
                 
-                // 4. Atribuir os valores às nossas variáveis.
                 locationLat = locationData.lat || null;
                 locationLng = locationData.lng || null;
                 locationZoom = locationData.zoom || null;
 
-                // 5. Construir a URL com os dados obtidos.
                 if (locationLat && locationLng && locationZoom) {
                     locationUrl = `https://wplace.live/?lat=${locationLat}&lng=${locationLng}&zoom=${locationZoom}`;
                 }
             }
         } catch (e) {
             console.error("Wgram: Erro ao ler ou analisar 'location' do localStorage.", e);
-            // As variáveis permanecerão nulas, então o processo continua sem falhar.
         }
-
-        // --- FIM DAS MODIFICAÇÕES ---
 
         const hexId = Math.random().toString(16).substr(2, 8);
         const userDocRef = this.db.collection('users').doc(user.uid);
@@ -231,16 +280,12 @@ async saveAndCopyCoordsId(coords) {
                     tl_x: coords[0], tl_y: coords[1],
                     px_x: coords[2], px_y: coords[3],
                 },
-                
-                // --- ADIÇÃO DOS NOVOS CAMPOS ---
                 location: {
                     lat: locationLat,
                     lng: locationLng,
                     zoom: locationZoom
                 },
-                locationUrl: locationUrl, // O link completo
-                // ---------------------------------
-
+                locationUrl: locationUrl,
                 creatorId: user.uid,
                 creatorEmail: user.email,
                 creatorWplaceUser: wplaceUsername,
@@ -263,8 +308,6 @@ async saveAndCopyCoordsId(coords) {
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
-// Wgram.user.js - VERSÃO FINAL CORRIGIDA
-// Wgram.user.js - VERSÃO FINAL COM A SINTAXE CORRIGIDA
 async loadItemFromFirestore(id) {
     this.uiManager.displayStatus(`A procurar ID ${id}...`);
     this.uiManager.hideInfoAndCoords();
@@ -272,13 +315,11 @@ async loadItemFromFirestore(id) {
     const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
     let docSnap = await projectDocRef.get();
 
-    // CORREÇÃO 1: Removido os parênteses de .exists()
     if (!docSnap.exists) {
         const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
         docSnap = await coordsDocRef.get();
     }
 
-    // CORREÇÃO 2: Removido os parênteses de .exists()
     if (!docSnap.exists) {
         return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
     }
@@ -289,11 +330,8 @@ async loadItemFromFirestore(id) {
 
     if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
         this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
-        
         sessionStorage.setItem('wgram_pending_load', id);
-        
         window.location.href = redirectUrl;
-        
         return; 
     }
 
@@ -332,7 +370,7 @@ async loadItemFromFirestore(id) {
     async loadCoords(doc) {
         const data = doc.data();
         const { coords } = data;
-        const url = `https://wplace.live/#/${coords.tl_x}/${coords.tl_y}/${coords.px_x}/${coords.px_y}`;
+        const url = `https://wplace.live/#/${coords.tl_x}/${coords.tl_y}/${coords.px_x}/${coords.py_y}`;
         window.open(url, '_self');
         this.uiManager.displayStatus(`A navegar para as coordenadas partilhadas por ${data.creatorWplaceUser}.`);
     }
@@ -409,18 +447,11 @@ async loadItemFromFirestore(id) {
                 this.injector.injectFetchSpy();
                 this.apiManager.initializeApiListener();
 
-                // --- LÓGICA DE CARREGAMENTO PENDENTE ---
-                // 1. Verifica se há uma "intenção" salva no sessionStorage.
                 const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
                 
                 if (pendingLoadId) {
                     console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
-                    
-                    // 2. Limpa o sessionStorage IMEDIATAMENTE para evitar re-execução.
                     sessionStorage.removeItem('wgram_pending_load');
-                    
-                    // 3. Executa o carregamento.
-                    // Usamos um pequeno timeout para garantir que a UI esteja pronta.
                     setTimeout(() => this.templateManager.loadItemFromFirestore(pendingLoadId), 100);
                 }
 
