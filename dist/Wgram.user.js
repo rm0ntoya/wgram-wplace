@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.7.1
+// @version      1.7.2
 // @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
