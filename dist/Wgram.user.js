@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Wgram - Arte em forma de Pixels
+// @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      2.8.2
-// @description  Um script de usuário para carregar templates e partilhar coordenadas do WGram com captura aprimorada e modo manutenção.
+// @version      1.8.3
+// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
@@ -132,6 +132,18 @@
                 .buildElement()
             .buildElement()
             .addHr().buildElement()
+             // --- NOVA SEÇÃO DE FERRAMENTAS ---
+            .addDiv({ id: 'wgram-tools' })
+                .addButton({ 
+                    id: 'wgram-btn-remove-lp', 
+                    innerHTML: '<i class="fas fa-trash-alt"></i> Limpar Chave \'lp\'',
+                    title: 'Remove a chave "lp" do localStorage do site.' 
+                }, (_, btn) => { 
+                    btn.onclick = () => this.#handleRemoveLpKey(); 
+                })
+                .buildElement()
+            .buildElement()
+            .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' }).buildElement()
                 .addDiv({ id: 'wgram-project-info' })
@@ -164,6 +176,15 @@
         .buildElement()
         .buildOverlay(document.body);
         this.handleDrag('wgram-overlay', 'wgram-drag-handle');
+    }
+    #handleRemoveLpKey() {
+        try {
+            localStorage.removeItem('lp');
+            this.displayStatus("Chave 'lp' removida do localStorage com sucesso!");
+        } catch (error) {
+            this.displayError("Falha ao remover a chave 'lp'.");
+            console.error("Erro ao remover 'lp' do localStorage:", error);
+        }
     }
     #handleLoadProject() {
         const projectId = document.getElementById('wgram-project-id').value.trim();
