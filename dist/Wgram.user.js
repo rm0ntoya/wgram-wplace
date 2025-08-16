@@ -169,7 +169,7 @@
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Limpar 'lp' ao iniciar" })
+                    .addSmall({ textContent: "Limpar contas ao iniciar" })
                     .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
                         .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
