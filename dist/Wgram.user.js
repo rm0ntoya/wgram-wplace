@@ -118,8 +118,10 @@
         .buildElement()
         .buildOverlay(document.body);
     }
-    buildMainOverlay(user) {
+    buildMainOverlay(user, userData) {
         this.destroyOverlay('wgram-login-overlay');
+        const wplaceUsername = userData.wplaceUsername || 'Não definido';
+
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
                 .addDiv({ id: 'wgram-drag-handle' }).buildElement()
@@ -128,7 +130,12 @@
             .buildElement()
             .addHr().buildElement()
             .addDiv({ id: 'wgram-user-profile' })
-                .addSmall({ textContent: user.email }).buildElement()
+                .addDiv({ id: 'wgram-user-info' }) // Container para nome e email
+                    .addSmall({ id: 'wgram-wplace-username', textContent: wplaceUsername, style: 'font-weight: bold; font-size: 1.1em;' })
+                    .buildElement()
+                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
+                    .buildElement()
+                .buildElement()
                 .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
                 .buildElement()
             .buildElement()
@@ -162,7 +169,7 @@
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Limpar Contas ao Iniciar" })
+                    .addSmall({ textContent: "Limpar 'lp' ao iniciar" })
                     .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
                         .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
@@ -317,13 +324,28 @@
         const userDocRef = this.db.collection('users').doc(user.uid);
         try {
             const docSnap = await userDocRef.get();
-            if (docSnap.exists && docSnap.data().settings) {
-                return docSnap.data().settings;
+            if (docSnap.exists && docSnap.data()) {
+                return docSnap.data().settings || {};
             }
             return {};
         } catch (error) {
             console.error("Wgram: Erro ao buscar configurações do usuário:", error);
             return {};
+        }
+      }
+      async getUserData() {
+        const user = this.auth.currentUser;
+        if (!user) return null;
+        const userDocRef = this.db.collection('users').doc(user.uid);
+        try {
+            const docSnap = await userDocRef.get();
+            if (docSnap.exists) {
+                return docSnap.data();
+            }
+            return null;
+        } catch (error) {
+            console.error("Wgram: Erro ao buscar dados do usuário:", error);
+            return null;
         }
       }
 async saveAndCopyCoordsId(coords) {
@@ -533,16 +555,17 @@ async loadItemFromFirestore(id) {
                 if (user) {
                     console.log("Utilizador logado:", user.email);
                     
-                    const userSettings = await this.authManager.getUserSettings();
+                    const userData = await this.authManager.getUserData();
+                    const userSettings = userData ? userData.settings : {};
+                    
                     if (userSettings && userSettings.autoClearLp) {
                         if (localStorage.getItem('lp')) {
                             localStorage.removeItem('lp');
                             this.uiManager.displayStatus("Chave 'lp' removida automaticamente.");
                         }
-                        
                     }
 
-                    this.uiManager.buildMainOverlay(user);
+                    this.uiManager.buildMainOverlay(user, userData || {});
                     this.templateManager.setUserId(user.uid);
                     this.injector.injectFetchSpy();
                     this.apiManager.initializeApiListener();
@@ -565,6 +588,8 @@ async loadItemFromFirestore(id) {
     }
     injectCSS() { 
         const customCSS = `
+            #wgram-user-profile { display: flex; justify-content: space-between; align-items: center; }
+            #wgram-user-info { display: flex; flex-direction: column; }
             .wgram-setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
             .wgram-toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
             .wgram-toggle-switch input { opacity: 0; width: 0; height: 0; }
