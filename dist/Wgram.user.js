@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.4
+// @version      1.8.5
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -56,6 +56,7 @@
     addButton(additionalProperties = {}, callback = () => {}) { const button = this.#createElement('button', {}, additionalProperties); callback(this, button); return this; }
     addInput(additionalProperties = {}, callback = () => {}) { const input = this.#createElement('input', {}, additionalProperties); callback(this, input); return this; }
     addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
+    addLabel(additionalProperties = {}, callback = () => {}) { const label = this.#createElement('label', {}, additionalProperties); callback(this, label); return this; }
   }
 
   // --- Módulo: src/core/Template.js ---
@@ -158,12 +159,12 @@
                 }).buildElement()
             .buildElement()
             .addHr().buildElement()
-            // --- NOVA SEÇÃO DE CONFIGURAÇÕES ---
             .addDiv({ id: 'wgram-settings' })
+                .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
                     .addSmall({ textContent: "Limpar 'lp' ao iniciar" })
                     .buildElement()
-                    .addDiv({ className: 'wgram-toggle-switch' })
+                    .addLabel({ className: 'wgram-toggle-switch' })
                         .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
                         .buildElement()
                         .addDiv({ className: 'wgram-toggle-slider' })
@@ -184,14 +185,12 @@
     #setupSettingsListeners() {
         const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
         if (clearLpToggle) {
-            // Carrega o estado inicial do toggle
             this.authManager.getUserSettings().then(settings => {
                 if (settings && settings.autoClearLp) {
                     clearLpToggle.checked = true;
                 }
             });
 
-            // Adiciona o listener para salvar mudanças
             clearLpToggle.addEventListener('change', (e) => {
                 const isEnabled = e.target.checked;
                 this.authManager.updateUserSetting('autoClearLp', isEnabled);
@@ -534,7 +533,6 @@ async loadItemFromFirestore(id) {
                 if (user) {
                     console.log("Utilizador logado:", user.email);
                     
-                    // Verifica e executa a limpeza automática
                     const userSettings = await this.authManager.getUserSettings();
                     if (userSettings && userSettings.autoClearLp) {
                         if (localStorage.getItem('lp')) {
@@ -564,7 +562,28 @@ async loadItemFromFirestore(id) {
             });
         }
     }
-    injectCSS() { try { const css = GM_getResourceText('WGRAM_CSS'); if (css) { GM_addStyle(css); } else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } }
+    injectCSS() { 
+        const customCSS = `
+            .wgram-setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+            .wgram-toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+            .wgram-toggle-switch input { opacity: 0; width: 0; height: 0; }
+            .wgram-toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5563; transition: .4s; border-radius: 22px; }
+            .wgram-toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+            input:checked + .wgram-toggle-slider { background-color: #3b82f6; }
+            input:checked + .wgram-toggle-slider:before { transform: translateX(18px); }
+        `;
+        GM_addStyle(customCSS);
+        try { 
+            const css = GM_getResourceText('WGRAM_CSS'); 
+            if (css) { 
+                GM_addStyle(css); 
+            } else { 
+                console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); 
+            } 
+        } catch (error) { 
+            console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); 
+        } 
+    }
   }
 
   const wgram = new WgramScript();
