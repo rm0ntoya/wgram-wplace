@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.3
+// @version      1.8.4
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -132,18 +132,6 @@
                 .buildElement()
             .buildElement()
             .addHr().buildElement()
-             // --- NOVA SEÇÃO DE FERRAMENTAS ---
-            .addDiv({ id: 'wgram-tools' })
-                .addButton({ 
-                    id: 'wgram-btn-remove-lp', 
-                    innerHTML: '<i class="fas fa-trash-alt"></i> Limpar Chave \'lp\'',
-                    title: 'Remove a chave "lp" do localStorage do site.' 
-                }, (_, btn) => { 
-                    btn.onclick = () => this.#handleRemoveLpKey(); 
-                })
-                .buildElement()
-            .buildElement()
-            .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' }).buildElement()
                 .addDiv({ id: 'wgram-project-info' })
@@ -169,21 +157,46 @@
                     innerHTML: 'Não tem um ID? Visite <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
                 }).buildElement()
             .buildElement()
+            .addHr().buildElement()
+            // --- NOVA SEÇÃO DE CONFIGURAÇÕES ---
+            .addDiv({ id: 'wgram-settings' })
+                .addDiv({ className: 'wgram-setting-item' })
+                    .addSmall({ textContent: "Limpar 'lp' ao iniciar" })
+                    .buildElement()
+                    .addDiv({ className: 'wgram-toggle-switch' })
+                        .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
+                        .buildElement()
+                        .addDiv({ className: 'wgram-toggle-slider' })
+                        .buildElement()
+                    .buildElement()
+                .buildElement()
+            .buildElement()
             .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
             .addDiv({ id: 'wgram-credits' })
                 .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' })
                 .buildElement()
         .buildElement()
         .buildOverlay(document.body);
+
         this.handleDrag('wgram-overlay', 'wgram-drag-handle');
+        this.#setupSettingsListeners();
     }
-    #handleRemoveLpKey() {
-        try {
-            localStorage.removeItem('lp');
-            this.displayStatus("Chave 'lp' removida do localStorage com sucesso!");
-        } catch (error) {
-            this.displayError("Falha ao remover a chave 'lp'.");
-            console.error("Erro ao remover 'lp' do localStorage:", error);
+    #setupSettingsListeners() {
+        const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
+        if (clearLpToggle) {
+            // Carrega o estado inicial do toggle
+            this.authManager.getUserSettings().then(settings => {
+                if (settings && settings.autoClearLp) {
+                    clearLpToggle.checked = true;
+                }
+            });
+
+            // Adiciona o listener para salvar mudanças
+            clearLpToggle.addEventListener('change', (e) => {
+                const isEnabled = e.target.checked;
+                this.authManager.updateUserSetting('autoClearLp', isEnabled);
+                this.displayStatus(`Limpeza automática de 'lp' ${isEnabled ? 'ativada' : 'desativada'}.`);
+            });
         }
     }
     #handleLoadProject() {
@@ -287,6 +300,31 @@
         } catch (error) {
             console.error("Wgram: Erro ao verificar modo manutenção.", error);
             return { isActive: false };
+        }
+      }
+      async updateUserSetting(key, value) {
+        const user = this.auth.currentUser;
+        if (!user) return;
+        const userDocRef = this.db.collection('users').doc(user.uid);
+        try {
+            await userDocRef.set({ settings: { [key]: value } }, { merge: true });
+        } catch (error) {
+            console.error("Wgram: Erro ao salvar configuração do usuário:", error);
+        }
+      }
+      async getUserSettings() {
+        const user = this.auth.currentUser;
+        if (!user) return {};
+        const userDocRef = this.db.collection('users').doc(user.uid);
+        try {
+            const docSnap = await userDocRef.get();
+            if (docSnap.exists && docSnap.data().settings) {
+                return docSnap.data().settings;
+            }
+            return {};
+        } catch (error) {
+            console.error("Wgram: Erro ao buscar configurações do usuário:", error);
+            return {};
         }
       }
 async saveAndCopyCoordsId(coords) {
@@ -495,6 +533,16 @@ async loadItemFromFirestore(id) {
             this.authManager.onAuthStateChanged(async (user) => {
                 if (user) {
                     console.log("Utilizador logado:", user.email);
+                    
+                    // Verifica e executa a limpeza automática
+                    const userSettings = await this.authManager.getUserSettings();
+                    if (userSettings && userSettings.autoClearLp) {
+                        if (localStorage.getItem('lp')) {
+                            localStorage.removeItem('lp');
+                            this.uiManager.displayStatus("Chave 'lp' removida automaticamente.");
+                        }
+                    }
+
                     this.uiManager.buildMainOverlay(user);
                     this.templateManager.setUserId(user.uid);
                     this.injector.injectFetchSpy();
