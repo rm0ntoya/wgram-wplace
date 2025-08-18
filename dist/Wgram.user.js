@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.6
+// @version      1.8.7
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -157,6 +157,8 @@
                 .addDiv({ id: 'wgram-template-buttons' })
                     .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
                     .buildElement()
+                    .addButton({ id: 'wgram-btn-my-projects', innerHTML: '<i class="fas fa-folder-open"></i> Meus Projetos' }, (_, btn) => { btn.onclick = () => this.#handleShowMyProjects(); })
+                    .buildElement()
                     .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); })
                     .buildElement()
                 .buildElement()
@@ -189,6 +191,39 @@
         this.handleDrag('wgram-overlay', 'wgram-drag-handle');
         this.#setupSettingsListeners();
     }
+    buildProjectsOverlay(projects) {
+        this.destroyOverlay('wgram-projects-overlay');
+        const builder = new Overlay(); 
+        builder.addDiv({ id: 'wgram-projects-overlay' })
+            .addDiv({ id: 'wgram-projects-header' })
+                .addHeader(2, { textContent: 'Meus Projetos' }).buildElement()
+                .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-projects-overlay'))
+                .buildElement()
+            .buildElement()
+            .addDiv({ id: 'wgram-projects-list' });
+    
+        if (projects.length === 0) {
+            builder.addP({ textContent: 'Você ainda não tem projetos.' }).buildElement();
+        } else {
+            projects.forEach(project => {
+                builder.addDiv({ className: 'wgram-project-item' })
+                    .addDiv({ className: 'wgram-project-item-info' })
+                        .addP({ textContent: project.name, style: 'font-weight: bold;' }).buildElement()
+                        .addSmall({ textContent: `${project.pixels.toLocaleString('pt-BR')} pixels` }).buildElement()
+                    .buildElement()
+                    .addButton({ innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar' }, (_, btn) => {
+                        btn.onclick = () => {
+                            this.destroyOverlay('wgram-projects-overlay');
+                            this.templateManager.loadItemFromFirestore(project.id);
+                        };
+                    })
+                    .buildElement()
+                .buildElement();
+            });
+        }
+    
+        builder.buildElement().buildOverlay(document.body);
+    }
     #setupSettingsListeners() {
         const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
         if (clearLpToggle) {
@@ -209,6 +244,17 @@
         const projectId = document.getElementById('wgram-project-id').value.trim();
         if (!projectId) { return this.displayError("Por favor, insira um ID."); }
         this.templateManager.loadItemFromFirestore(projectId);
+    }
+    async #handleShowMyProjects() {
+        this.displayStatus("Buscando seus projetos...");
+        try {
+            const projects = await this.authManager.getUserProjects();
+            this.buildProjectsOverlay(projects);
+            this.displayStatus("Lista de projetos carregada.");
+        } catch (error) {
+            this.displayError("Falha ao buscar projetos.");
+            console.error(error);
+        }
     }
     #handleCopyCoordsId() {
         if (this.isWaitingForCoords) {
@@ -348,6 +394,23 @@
             return null;
         }
       }
+      async getUserProjects() {
+        const user = this.auth.currentUser;
+        if (!user) {
+            throw new Error("Usuário não autenticado.");
+        }
+        const projects = [];
+        const projectsRef = this.db.collection('users').doc(user.uid).collection('projects');
+        const querySnapshot = await projectsRef.get();
+        querySnapshot.forEach((doc) => {
+            projects.push({
+                id: doc.id,
+                name: doc.data().name,
+                pixels: doc.data().calculations.totalPixels || 0
+            });
+        });
+        return projects;
+      }
 async saveAndCopyCoordsId(coords) {
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
@@ -418,12 +481,20 @@ async loadItemFromFirestore(id) {
     this.uiManager.displayStatus(`A procurar ID ${id}...`);
     this.uiManager.hideInfoAndCoords();
 
-    const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
-    let docSnap = await projectDocRef.get();
+    // Tenta carregar de projetos públicos
+    let docRef = this.authManager.db.collection('publicProjects').doc(id);
+    let docSnap = await docRef.get();
 
+    // Se não encontrar, tenta carregar de projetos do usuário
+    if (!docSnap.exists && this.authManager.auth.currentUser) {
+        docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
+        docSnap = await docRef.get();
+    }
+
+    // Se ainda não encontrar, tenta carregar de coordenadas partilhadas
     if (!docSnap.exists) {
-        const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
-        docSnap = await coordsDocRef.get();
+        docRef = this.authManager.db.collection('sharedCoords').doc(id);
+        docSnap = await docRef.get();
     }
 
     if (!docSnap.exists) {
@@ -453,8 +524,13 @@ async loadItemFromFirestore(id) {
         const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
         if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
         const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
-        this.uiManager.displayProjectInfo({ name: name, owner: ownerName, pixels: calculations.totalPixels, coords: coordsArray });
-        await doc.ref.update({ loads: firebase.firestore.FieldValue.increment(1) });
+        this.uiManager.displayProjectInfo({ name: name, owner: ownerName || 'Você', pixels: calculations.totalPixels, coords: coordsArray });
+        
+        // Apenas incrementa loads para projetos públicos
+        if (doc.ref.parent.id === 'publicProjects') {
+            await doc.ref.update({ loads: firebase.firestore.FieldValue.increment(1) });
+        }
+
         if (coordsArray) {
             this.uiManager.toggleCoordsFields(false);
             await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
@@ -597,6 +673,12 @@ async loadItemFromFirestore(id) {
             .wgram-toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
             input:checked + .wgram-toggle-slider { background-color: #3b82f6; }
             input:checked + .wgram-toggle-slider:before { transform: translateX(18px); }
+            #wgram-projects-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 500px; background-color: #1f2937; color: #d1d5db; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 10000; border: 1px solid #374151; }
+            #wgram-projects-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #374151; }
+            #wgram-projects-list { max-height: 400px; overflow-y: auto; padding: 1rem; }
+            .wgram-project-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #374151; }
+            .wgram-project-item:last-child { border-bottom: none; }
+            .wgram-project-item-info { display: flex; flex-direction: column; }
         `;
         GM_addStyle(customCSS);
         try { 
