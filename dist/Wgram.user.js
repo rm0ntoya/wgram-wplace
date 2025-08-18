@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.7
+// @version      1.8.8
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -442,7 +442,7 @@ async saveAndCopyCoordsId(coords) {
         
         try {
             const userDoc = await userDocRef.get();
-            const wplaceUsername = userDoc.exists ? userDoc.data().wplaceUsername : 'Desconhecido';
+            const wplaceUsername = (userDoc.exists && userDoc.data().wplaceUsername) ? userDoc.data().wplaceUsername : 'Desconhecido';
 
             const coordsData = {
                 coords: {
