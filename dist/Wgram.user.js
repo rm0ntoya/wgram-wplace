@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.1
+// @version      1.9.2
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -62,7 +62,7 @@
   // --- Módulo: src/core/Template.js ---
   class Template {
     constructor({ displayName = 'Template Carregado', authorId = '', coords = [0,0,0,0], chunks = {} }) { this.id = crypto.randomUUID(); this.displayName = displayName; this.authorId = authorId; this.coords = coords; this.pixelCount = 0; this.width = 0; this.height = 0; this.chunks = chunks; this.pixelMap = new Map(); }
-    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = 0; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue; this.pixelCount++; const colorString = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`; this.chunks[tileKey].ctx.fillStyle = colorString; this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1); const globalPixelKey = `${currentGlobalPixelX},${currentGlobalPixelY}`; this.pixelMap.set(globalPixelKey, [...pixelData]); } } for (const tileKey in this.chunks) { const chunk = this.chunks[tileKey]; chunk.bitmap = await chunk.canvas.transferToImageBitmap(); delete chunk.canvas; delete chunk.ctx; } }
+    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = 0; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue; this.pixelCount++; const colorString = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`; this.chunks[tileKey].ctx.fillStyle = colorString; this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1); const globalPixelKey = `${currentGlobalPixelX},${currentGlobalPixelY}`; this.pixelMap.set(globalPixelKey, [...pixelData]); } } for (const tileKey in this.chunks) { const chunk = this.chunks[tileKey]; chunk.bitmap = await chunk.canvas.transferToImageBitmap(); delete chunk.canvas; delete chunk.ctx; } }
     getChunkForTile(tileCoords) { const tileKey = `${tileCoords[0]},${tileCoords[1]}`; const chunk = this.chunks[tileKey]; if (chunk && chunk.bitmap) { return { bitmap: chunk.bitmap, drawX: 0, drawY: 0 }; } return null; }
     getPixel(x, y) { return this.pixelMap.get(`${x},${y}`); }
   }
@@ -630,11 +630,8 @@ async loadItemFromFirestore(id) {
         }
         this.resetProgress();
         this.progress.total = this.templates[0].pixelCount;
-        this.uiManager.displayStatus("A verificar... Navegue pelo mapa para analisar.");
+        this.uiManager.displayStatus("Análise iniciada. Mova o mapa para atualizar os dados.");
         this.uiManager.displayProgress(this.progress);
-        // Força o recarregamento dos tiles visíveis (uma forma simples é simular um zoom)
-        // A API do wplace.live não é pública, então uma recarga completa é uma opção
-        window.location.reload();
     }
     analyzeTile(tileCoords, tileImageData) {
         const tileKey = `${tileCoords[0]},${tileCoords[1]}`;
