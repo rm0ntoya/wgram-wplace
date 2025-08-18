@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.2
-// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
-// @author       rm0ntoya
+// @version      2.0.0
+// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas.
+// @author       rm0ntoya & Gemini
 // @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
@@ -355,7 +355,7 @@
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
 
-  // --- Módulo: src/core/AuthManager.js (CORRIGIDO) ---
+  // --- Módulo: src/core/AuthManager.js ---
   class AuthManager {
       constructor(config, uiManager) { this.uiManager = uiManager; try { this.firebaseApp = firebase.initializeApp(config); this.auth = firebase.auth(); this.db = firebase.firestore(); } catch (e) { console.error("Erro ao inicializar o Firebase.", e); alert("Falha ao conectar com o Firebase."); } }
       onAuthStateChanged(callback) { this.auth.onAuthStateChanged(callback); }
@@ -445,7 +445,7 @@
         });
         return projects;
       }
-async saveAndCopyCoordsId(coords) {
+      async saveAndCopyCoordsId(coords) {
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
 
@@ -505,54 +505,84 @@ async saveAndCopyCoordsId(coords) {
             console.error(error);
         }
     }
+
+    // NOVO: Função para salvar os dados da conta Wplace no Firestore
+    async saveWplaceAccountData(accountData) {
+        const user = this.auth.currentUser;
+        if (!user) {
+            console.warn("[Wgram] Tentativa de salvar dados da conta sem usuário logado.");
+            return;
+        }
+        if (!accountData || !accountData.id) {
+            console.error("[Wgram] Dados da conta inválidos ou sem ID para salvar.", accountData);
+            return;
+        }
+
+        try {
+            const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(String(accountData.id));
+            
+            const dataToSave = {
+                ...accountData,
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            await accountDocRef.set(dataToSave, { merge: true });
+            this.uiManager.displayStatus(`Conta Wplace "${accountData.username}" sincronizada.`);
+            console.log(`[Wgram] Dados da conta ${accountData.username} (ID: ${accountData.id}) salvos com sucesso.`);
+
+        } catch (error) {
+            this.uiManager.displayError("Falha ao sincronizar conta Wplace.");
+            console.error("[Wgram] Erro ao salvar dados da conta Wplace:", error);
+        }
+    }
   }
 
-  // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
+  // --- Módulo: src/core/TemplateManager.js ---
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
-async loadItemFromFirestore(id) {
-    this.uiManager.displayStatus(`A procurar ID ${id}...`);
-    this.uiManager.hideInfoAndCoords();
+    async loadItemFromFirestore(id) {
+        this.uiManager.displayStatus(`A procurar ID ${id}...`);
+        this.uiManager.hideInfoAndCoords();
 
-    // Tenta carregar de projetos públicos
-    let docRef = this.authManager.db.collection('publicProjects').doc(id);
-    let docSnap = await docRef.get();
+        // Tenta carregar de projetos públicos
+        let docRef = this.authManager.db.collection('publicProjects').doc(id);
+        let docSnap = await docRef.get();
 
-    // Se não encontrar, tenta carregar de projetos do usuário
-    if (!docSnap.exists && this.authManager.auth.currentUser) {
-        docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
-        docSnap = await docRef.get();
+        // Se não encontrar, tenta carregar de projetos do usuário
+        if (!docSnap.exists && this.authManager.auth.currentUser) {
+            docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
+            docSnap = await docRef.get();
+        }
+
+        // Se ainda não encontrar, tenta carregar de coordenadas partilhadas
+        if (!docSnap.exists) {
+            docRef = this.authManager.db.collection('sharedCoords').doc(id);
+            docSnap = await docRef.get();
+        }
+
+        if (!docSnap.exists) {
+            return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
+        }
+
+        const data = docSnap.data();
+
+        const redirectUrl = data.coordinates ? data.coordinates.url : null;
+
+        if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
+            this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
+            sessionStorage.setItem('wgram_pending_load', id);
+            window.location.href = redirectUrl;
+            return; 
+        }
+
+        if (data.processedImageBase64) {
+            await this.loadProject(docSnap);
+        } 
+        else if (data.coords) {
+            await this.loadCoords(docSnap);
+        }
     }
-
-    // Se ainda não encontrar, tenta carregar de coordenadas partilhadas
-    if (!docSnap.exists) {
-        docRef = this.authManager.db.collection('sharedCoords').doc(id);
-        docSnap = await docRef.get();
-    }
-
-    if (!docSnap.exists) {
-        return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
-    }
-
-    const data = docSnap.data();
-
-    const redirectUrl = data.coordinates ? data.coordinates.url : null;
-
-    if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
-        this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
-        sessionStorage.setItem('wgram_pending_load', id);
-        window.location.href = redirectUrl;
-        return; 
-    }
-
-    if (data.processedImageBase64) {
-        await this.loadProject(docSnap);
-    } 
-    else if (data.coords) {
-        await this.loadCoords(docSnap);
-    }
-}
     async loadProject(doc) {
         const projectData = doc.data();
         const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
@@ -602,12 +632,40 @@ async loadItemFromFirestore(id) {
 
   // --- Módulo: src/core/ApiManager.js ---
   class ApiManager {
-    constructor(templateManager, uiManager) { this.templateManager = templateManager; this.uiManager = uiManager; this.disableAll = false; this.coordsTilePixel = []; }
+    // MODIFICADO: Adicionado authManager ao construtor
+    constructor(templateManager, uiManager, authManager) { 
+        this.templateManager = templateManager; 
+        this.uiManager = uiManager; 
+        this.authManager = authManager; // NOVO: Referência ao AuthManager
+        this.disableAll = false; 
+        this.coordsTilePixel = []; 
+    }
     initializeApiListener() { window.addEventListener('message', async (event) => { const { data } = event; if (!data || !data.isWgramMessage || data.source !== 'wgram-spy') { return; } const endpoint = this.#parseEndpoint(data.endpoint); if (endpoint === 'tiles') { await this.#handleTileResponse(data); return; } if (data.jsonData) { this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint); } }); }
     #parseEndpoint(url) { if (!url) return ''; return url.split('?')[0].split('/').filter(s => s && isNaN(Number(s)) && !s.includes('.')).pop() || ''; }
-    #handleJsonResponse(endpoint, jsonData, fullUrl) { switch (endpoint) { case 'pixel': this.#processPixelCoords(fullUrl); break; } }
+    
+    // MODIFICADO: Adicionado tratamento para o endpoint 'me'
+    #handleJsonResponse(endpoint, jsonData, fullUrl) { 
+        switch (endpoint) { 
+            case 'pixel': 
+                this.#processPixelCoords(fullUrl); 
+                break;
+            // NOVO: Caso para capturar os dados do usuário
+            case 'me':
+                this.#handleAccountInfo(jsonData);
+                break;
+        } 
+    }
+    
     #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); }
     getCurrentCoords() { return this.coordsTilePixel; }
+    
+    // NOVO: Função para enviar os dados da conta para o AuthManager
+    #handleAccountInfo(jsonData) {
+        if (this.authManager) {
+            this.authManager.saveWplaceAccountData(jsonData);
+        }
+    }
+
     async #handleTileResponse(data) { 
         let tileCoords = data.endpoint.split('/'); 
         tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; 
@@ -641,6 +699,8 @@ async loadItemFromFirestore(id) {
                 const url = (args[0] instanceof Request) ? args[0].url : (args[0] || '');
                 const contentType = clonedResponse.headers.get('content-type') || '';
                 if (contentType.includes('application/json')) {
+                    // Este bloco já captura TODOS os JSONs, incluindo o de '/me'.
+                    // A lógica de filtragem será feita no ApiManager.
                     clonedResponse.json().then(jsonData => { window.postMessage({ isWgramMessage: true, source: SPY_SOURCE, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${SCRIPT_NAME}] Erro ao processar JSON:`, err); });
                 } else if (contentType.includes('image/') && !url.includes('openfreemap') && !url.includes('maps')) {
                     const blob = await clonedResponse.blob();
@@ -662,7 +722,20 @@ async loadItemFromFirestore(id) {
 
   // --- Módulo: src/main.js ---
   class WgramScript {
-    constructor() { this.info = { name: GM_info.script.name, version: GM_info.script.version }; this.uiManager = new UIManager(this.info.name, this.info.version); this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); this.apiManager = new ApiManager(this.templateManager, this.uiManager); this.injector = new Injector(); this.uiManager.authManager = this.authManager; this.uiManager.templateManager = this.templateManager; this.uiManager.apiManager = this.apiManager; }
+    constructor() { 
+        this.info = { name: GM_info.script.name, version: GM_info.script.version }; 
+        this.uiManager = new UIManager(this.info.name, this.info.version); 
+        this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); 
+        this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); 
+        
+        // MODIFICADO: Passando o authManager para o ApiManager
+        this.apiManager = new ApiManager(this.templateManager, this.uiManager, this.authManager); 
+        
+        this.injector = new Injector(); 
+        this.uiManager.authManager = this.authManager; 
+        this.uiManager.templateManager = this.templateManager; 
+        this.uiManager.apiManager = this.apiManager; 
+    }
     async start() {
         console.log(`[${this.info.name}] v${this.info.version} a iniciar...`);
         this.injectCSS();
