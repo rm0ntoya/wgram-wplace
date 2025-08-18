@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.0
+// @version      1.9.1
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -61,9 +61,10 @@
 
   // --- Módulo: src/core/Template.js ---
   class Template {
-    constructor({ displayName = 'Template Carregado', authorId = '', coords = [0,0,0,0], chunks = {} }) { this.id = crypto.randomUUID(); this.displayName = displayName; this.authorId = authorId; this.coords = coords; this.pixelCount = 0; this.width = 0; this.height = 0; this.chunks = chunks; }
-    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = this.width * this.height; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue; this.chunks[tileKey].ctx.fillStyle = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`; this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1); } } for (const tileKey in this.chunks) { const chunk = this.chunks[tileKey]; chunk.bitmap = await chunk.canvas.transferToImageBitmap(); delete chunk.canvas; delete chunk.ctx; } }
+    constructor({ displayName = 'Template Carregado', authorId = '', coords = [0,0,0,0], chunks = {} }) { this.id = crypto.randomUUID(); this.displayName = displayName; this.authorId = authorId; this.coords = coords; this.pixelCount = 0; this.width = 0; this.height = 0; this.chunks = chunks; this.pixelMap = new Map(); }
+    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = 0; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue; this.pixelCount++; const colorString = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`; this.chunks[tileKey].ctx.fillStyle = colorString; this.chunks[tileKey].ctx.fillRect(pixelXInTile * RENDER_SCALE + 1, pixelYInTile * RENDER_SCALE + 1, 1, 1); const globalPixelKey = `${currentGlobalPixelX},${currentGlobalPixelY}`; this.pixelMap.set(globalPixelKey, [...pixelData]); } } for (const tileKey in this.chunks) { const chunk = this.chunks[tileKey]; chunk.bitmap = await chunk.canvas.transferToImageBitmap(); delete chunk.canvas; delete chunk.ctx; } }
     getChunkForTile(tileCoords) { const tileKey = `${tileCoords[0]},${tileCoords[1]}`; const chunk = this.chunks[tileKey]; if (chunk && chunk.bitmap) { return { bitmap: chunk.bitmap, drawX: 0, drawY: 0 }; } return null; }
+    getPixel(x, y) { return this.pixelMap.get(`${x},${y}`); }
   }
 
   // --- Módulo: src/components/UIManager.js ---
@@ -148,6 +149,11 @@
                     .addP({ id: 'wgram-info-pixels' }).buildElement()
                     .addP({ id: 'wgram-info-coords' }).buildElement()
                 .buildElement()
+                .addDiv({ id: 'wgram-progress-info', style: 'display: none;' }) // Nova área de progresso
+                    .addP({ id: 'wgram-progress-correct' }).buildElement()
+                    .addP({ id: 'wgram-progress-incorrect' }).buildElement()
+                    .addP({ id: 'wgram-progress-missing' }).buildElement()
+                .buildElement()
                 .addDiv({ id: 'wgram-coords-container', style: 'display: none;' })
                     .addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement()
                     .addInput({ type: 'number', id: 'wgram-input-ty', placeholder: 'Tl Y' }).buildElement()
@@ -161,6 +167,8 @@
                     .buildElement()
                     .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); })
                     .buildElement()
+                .buildElement()
+                 .addButton({ id: 'wgram-btn-check-progress', innerHTML: '<i class="fas fa-check-double"></i> Verificar Progresso', style: 'display: none; width: 100%; margin-top: 5px;' }, (_, btn) => { btn.onclick = () => this.templateManager.checkProjectProgress(); })
                 .buildElement()
                 .addSmall({
                     id: 'wgram-site-promo',
@@ -336,24 +344,37 @@
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
     displayProjectInfo(project) {
         const infoContainer = document.getElementById('wgram-project-info');
-        const coordsContainer = document.getElementById('wgram-info-coords');
+        const checkProgressBtn = document.getElementById('wgram-btn-check-progress');
         if (infoContainer) {
+            infoContainer.style.display = 'block';
             this.updateElement('wgram-info-name', `<i class="fa-solid fa-file-signature fa-fw"></i> <strong>Nome:</strong> <span>${project.name}</span>`);
             this.updateElement('wgram-info-creator', `<i class="fa-solid fa-user fa-fw"></i> <strong>Criador:</strong> <span>${project.owner}</span>`);
             this.updateElement('wgram-info-pixels', `<i class="fa-solid fa-th fa-fw"></i> <strong>Píxeis:</strong> <span>${project.pixels.toLocaleString('pt-BR')}</span>`);
             if (project.coords) {
                 this.updateElement('wgram-info-coords', `<i class="fa-solid fa-map-marker-alt fa-fw"></i> <strong>Coords:</strong> <span>${project.coords.join(', ')}</span>`);
-                coordsContainer.style.display = 'flex';
-            } else {
-                coordsContainer.style.display = 'none';
             }
             infoContainer.classList.add('visible');
+            if (checkProgressBtn) checkProgressBtn.style.display = 'block';
         }
     }
     hideInfoAndCoords() {
         const infoContainer = document.getElementById('wgram-project-info');
+        const checkProgressBtn = document.getElementById('wgram-btn-check-progress');
+        const progressInfo = document.getElementById('wgram-progress-info');
         if (infoContainer) infoContainer.classList.remove('visible');
+        if (checkProgressBtn) checkProgressBtn.style.display = 'none';
+        if (progressInfo) progressInfo.style.display = 'none';
         this.toggleCoordsFields(false);
+    }
+    displayProgress({ correct, incorrect, missing, total }) {
+        const progressInfo = document.getElementById('wgram-progress-info');
+        if (progressInfo) {
+            progressInfo.style.display = 'block';
+            const percentage = total > 0 ? ((correct / total) * 100).toFixed(2) : 0;
+            this.updateElement('wgram-progress-correct', `<strong>Corretos:</strong> ${correct.toLocaleString('pt-BR')} (${percentage}%)`);
+            this.updateElement('wgram-progress-incorrect', `<strong>Incorretos:</strong> ${incorrect.toLocaleString('pt-BR')}`);
+            this.updateElement('wgram-progress-missing', `<strong>Faltantes:</strong> ${missing.toLocaleString('pt-BR')}`);
+        }
     }
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
@@ -512,8 +533,9 @@ async saveAndCopyCoordsId(coords) {
 
   // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
   class TemplateManager {
-    constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
+    constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; this.progress = { correct: 0, incorrect: 0, missing: 0, total: 0 }; this.analyzedTiles = new Set(); }
     setUserId(id) { this.userId = id; }
+    resetProgress() { this.progress = { correct: 0, incorrect: 0, missing: 0, total: 0 }; this.analyzedTiles.clear(); }
 async loadItemFromFirestore(id) {
     this.uiManager.displayStatus(`A procurar ID ${id}...`);
     this.uiManager.hideInfoAndCoords();
@@ -557,6 +579,7 @@ async loadItemFromFirestore(id) {
     }
 }
     async loadProject(doc) {
+        this.resetProgress();
         const projectData = doc.data();
         const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
         if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
@@ -564,7 +587,6 @@ async loadItemFromFirestore(id) {
         await this.authManager.updateUserLastLoadedProject(doc.id);
 
         const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
-        this.uiManager.displayProjectInfo({ name: name, owner: ownerName || 'Você', pixels: calculations.totalPixels, coords: coordsArray });
         
         // Apenas incrementa loads para projetos públicos
         if (doc.ref.parent.id === 'publicProjects') {
@@ -573,7 +595,10 @@ async loadItemFromFirestore(id) {
 
         if (coordsArray) {
             this.uiManager.toggleCoordsFields(false);
-            await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
+            const template = await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
+            if (template) {
+                this.uiManager.displayProjectInfo({ name: name, owner: ownerName || 'Você', pixels: template.pixelCount, coords: coordsArray });
+            }
         } else {
             this.uiManager.displayError("Projeto não tem coordenadas. Por favor, insira-as.");
             this.uiManager.toggleCoordsFields(true);
@@ -596,9 +621,54 @@ async loadItemFromFirestore(id) {
         window.open(url, '_self');
         this.uiManager.displayStatus(`A navegar para as coordenadas partilhadas por ${data.creatorWplaceUser}.`);
     }
-    async createTemplateFromBase64(base64, name, coords) { this.uiManager.displayStatus(`A processar o template "${name}"...`); try { const template = new Template({ displayName: name, coords: coords }); await template.processImage(base64); this.templates = [template]; this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`); this.setTemplatesShouldBeDrawn(true); } catch (error) { this.uiManager.displayError(`Falha ao processar o template: ${error.message}`); console.error(error); } }
+    async createTemplateFromBase64(base64, name, coords) { this.uiManager.displayStatus(`A processar o template "${name}"...`); try { const template = new Template({ displayName: name, coords: coords }); await template.processImage(base64); this.templates = [template]; this.progress.total = template.pixelCount; this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`); this.setTemplatesShouldBeDrawn(true); return template; } catch (error) { this.uiManager.displayError(`Falha ao processar o template: ${error.message}`); console.error(error); return null; } }
     async drawTemplateOnTile(tileBlob, tileCoords) { if (!this.templatesShouldBeDrawn || this.templates.length === 0) { return tileBlob; } const RENDER_SCALE = 3; const tileBitmap = await createImageBitmap(tileBlob); const scaledWidth = tileBitmap.width * RENDER_SCALE; const scaledHeight = tileBitmap.height * RENDER_SCALE; const canvas = new OffscreenCanvas(scaledWidth, scaledHeight); const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight); for (const template of this.templates) { const chunk = template.getChunkForTile(tileCoords); if (chunk) { ctx.drawImage(chunk.bitmap, 0, 0); } } return await canvas.convertToBlob({ type: 'image/png' }); }
     setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
+    checkProjectProgress() {
+        if (this.templates.length === 0) {
+            return this.uiManager.displayError("Nenhum template carregado para verificar.");
+        }
+        this.resetProgress();
+        this.progress.total = this.templates[0].pixelCount;
+        this.uiManager.displayStatus("A verificar... Navegue pelo mapa para analisar.");
+        this.uiManager.displayProgress(this.progress);
+        // Força o recarregamento dos tiles visíveis (uma forma simples é simular um zoom)
+        // A API do wplace.live não é pública, então uma recarga completa é uma opção
+        window.location.reload();
+    }
+    analyzeTile(tileCoords, tileImageData) {
+        const tileKey = `${tileCoords[0]},${tileCoords[1]}`;
+        if (this.templates.length === 0 || this.analyzedTiles.has(tileKey)) {
+            return;
+        }
+
+        const template = this.templates[0];
+        const [tileX, tileY] = tileCoords;
+        const TILE_SIZE = 1000;
+        
+        for (let yInTile = 0; yInTile < TILE_SIZE; yInTile++) {
+            for (let xInTile = 0; xInTile < TILE_SIZE; xInTile++) {
+                const globalX = tileX * TILE_SIZE + xInTile;
+                const globalY = tileY * TILE_SIZE + yInTile;
+                
+                const templatePixel = template.getPixel(globalX, globalY);
+                if (!templatePixel) continue;
+
+                const index = (yInTile * TILE_SIZE + xInTile) * 4;
+                const mapPixel = tileImageData.data.slice(index, index + 4);
+
+                if (mapPixel[3] === 0) { // Pixel transparente no mapa
+                    this.progress.missing++;
+                } else if (templatePixel[0] === mapPixel[0] && templatePixel[1] === mapPixel[1] && templatePixel[2] === mapPixel[2]) {
+                    this.progress.correct++;
+                } else {
+                    this.progress.incorrect++;
+                }
+            }
+        }
+        this.analyzedTiles.add(tileKey);
+        this.uiManager.displayProgress(this.progress);
+    }
   }
 
   // --- Módulo: src/core/ApiManager.js ---
@@ -609,7 +679,23 @@ async loadItemFromFirestore(id) {
     #handleJsonResponse(endpoint, jsonData, fullUrl) { switch (endpoint) { case 'pixel': this.#processPixelCoords(fullUrl); break; } }
     #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); }
     getCurrentCoords() { return this.coordsTilePixel; }
-    async #handleTileResponse(data) { let tileCoords = data.endpoint.split('/'); tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; const { blobID, blobData, blink } = data; const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords); window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*'); }
+    async #handleTileResponse(data) { 
+        let tileCoords = data.endpoint.split('/'); 
+        tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; 
+        
+        // Análise de Progresso
+        const originalBitmap = await createImageBitmap(data.blobData);
+        const canvas = new OffscreenCanvas(originalBitmap.width, originalBitmap.height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(originalBitmap, 0, 0);
+        const imageData = ctx.getImageData(0, 0, originalBitmap.width, originalBitmap.height);
+        this.templateManager.analyzeTile(tileCoords, imageData);
+        
+        // Desenho do Template
+        const { blobID, blobData, blink } = data; 
+        const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords); 
+        window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*'); 
+    }
   }
 
   // --- Módulo: src/core/Injector.js ---
@@ -725,6 +811,7 @@ async loadItemFromFirestore(id) {
             .wgram-project-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #374151; }
             .wgram-project-item:last-child { border-bottom: none; }
             .wgram-project-item-info { display: flex; flex-direction: column; }
+            #wgram-progress-info { margin-top: 10px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px; }
         `;
         GM_addStyle(customCSS);
         try { 
