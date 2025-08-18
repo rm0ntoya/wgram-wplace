@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      2.0.4
+// @version      2.0.5
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -457,57 +457,56 @@
             window.location.href = redirectUrl;
             return;
         }
-        await this.loadProject(projectData);
+        await this.loadProject(projectData, false); // false = não é público
     }
 
     async loadItemFromFirestore(id) {
         this.uiManager.displayStatus(`A procurar ID público ${id}...`);
-        let docRef = this.authManager.db.collection('publicProjects').doc(id);
-        let docSnap = await docRef.get();
-        let isPublicProject = docSnap.exists;
+        
+        const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
+        let docSnap = await projectDocRef.get();
 
-        if (!isPublicProject) {
-            docRef = this.authManager.db.collection('sharedCoords').doc(id);
-            docSnap = await docRef.get();
-        }
-        if (!docSnap.exists) {
-            return this.uiManager.displayError("Nenhum projeto público ou coordenadas encontrados com este ID.");
-        }
-        const data = docSnap.data();
-        const coords = data.coordinates || data.coords;
-        let redirectUrl = null;
-        if (coords && coords.lat && coords.lng && coords.zoom) {
-             redirectUrl = `https://wplace.live/?lat=${coords.lat}&lng=${coords.lng}&zoom=${coords.zoom}`;
-        } else if (data.locationUrl) {
-             redirectUrl = data.locationUrl;
-        }
-        if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
-            this.uiManager.displayStatus(`Redirecionando para a localização do item...`);
-            sessionStorage.setItem('wgram_pending_load', id);
-            sessionStorage.setItem('wgram_pending_load_type', 'public');
-            window.location.href = redirectUrl;
+        if (docSnap.exists) {
+            const projectData = { id: docSnap.id, ...docSnap.data() };
+            const coords = projectData.coordinates;
+            let redirectUrl = null;
+            if (coords && coords.lat && coords.lng && coords.zoom) {
+                redirectUrl = `https://wplace.live/?lat=${coords.lat}&lng=${coords.lng}&zoom=${coords.zoom}`;
+            }
+            if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
+                this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
+                sessionStorage.setItem('wgram_pending_load', id);
+                sessionStorage.setItem('wgram_pending_load_type', 'public');
+                window.location.href = redirectUrl;
+                return;
+            }
+            await this.loadProject(projectData, true); // true = é público
             return;
         }
-        
-        if (isPublicProject) {
-            await this.loadProject({ id, ...data });
-        } else if (data.coords) {
+
+        const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
+        docSnap = await coordsDocRef.get();
+        if (docSnap.exists) {
+            const data = docSnap.data();
             const { tl_x, tl_y, px_x, py_y } = data.coords;
             const url = `https://wplace.live/#/${tl_x}/${tl_y}/${px_x}/${py_y}`;
             window.open(url, '_self');
             this.uiManager.displayStatus(`A navegar para as coordenadas partilhadas por ${data.creatorWplaceUser}.`);
+            return;
         }
+
+        this.uiManager.displayError("Nenhum projeto público ou coordenadas encontrados com este ID.");
     }
 
-    async loadProject(projectData) {
-        const { processedImageBase64, name, coordinates, id } = projectData;
+    // CORREÇÃO: Função centralizada que recebe um booleano para tratar o contador de loads.
+    async loadProject(projectData, isPublic) {
+        const { processedImageBase64, name, coordinates } = projectData;
         if (!processedImageBase64) return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template.");
         if (!coordinates || coordinates.tl_x === undefined) return this.uiManager.displayError("Projeto não tem coordenadas de pixel salvas. Não é possível carregar o template.");
         
         const coordsArray = [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.py_y].map(Number);
         
-        // CORREÇÃO: A verificação de `ownerId` e o uso de `projectData.id` garantem que apenas projetos públicos tenham o contador incrementado.
-        if (projectData.ownerId) {
+        if (isPublic) {
             const projectRef = this.authManager.db.collection('publicProjects').doc(projectData.id);
             projectRef.update({ loads: firebase.firestore.FieldValue.increment(1) }).catch(e => console.error("Falha ao incrementar loads:", e));
         }
@@ -620,7 +619,7 @@
                             if (pendingLoadType === 'private') {
                                 const projectToLoad = await this.authManager.getUserProjectById(pendingLoadId);
                                 if (projectToLoad) {
-                                    this.templateManager.loadProject(projectToLoad);
+                                    this.templateManager.loadProject(projectToLoad, false); // false = não é público
                                 } else {
                                     this.uiManager.displayError("Não foi possível carregar o projeto privado pendente. Ele pode ter sido excluído.");
                                 }
