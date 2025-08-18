@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.1
+// @version      1.9.3
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -171,7 +171,7 @@
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Limpar contas ao iniciar ( apenas chrome )" })
+                    .addSmall({ textContent: "Limpar contas ao iniciar" })
                     .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
                         .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
@@ -713,98 +713,7 @@ async loadItemFromFirestore(id) {
             });
         }
     }
-    injectCSS() { 
-        const customCSS = `
-            :root {
-                --wgram-pink: #d6408b;
-                --wgram-orange: #f5a623;
-                --wgram-gradient: linear-gradient(90deg, var(--wgram-pink) 0%, var(--wgram-orange) 100%);
-                --wgram-bg: #212529;
-                --wgram-surface: #343a40;
-                --wgram-text: #f8f9fa;
-                --wgram-text-muted: #adb5bd;
-            }
-
-            #wgram-overlay, #wgram-login-overlay {
-                background-color: var(--wgram-bg);
-                color: var(--wgram-text);
-                border: 1px solid var(--wgram-surface);
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            }
-
-            #wgram-header h1 {
-                background: var(--wgram-gradient);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                font-weight: bold;
-            }
-
-            #wgram-overlay button, #wgram-login-overlay button {
-                background: var(--wgram-gradient);
-                border: none;
-                color: white;
-                padding: 10px 15px;
-                border-radius: 5px;
-                cursor: pointer;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-            }
-
-            #wgram-overlay button:hover, #wgram-login-overlay button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 15px rgba(245, 166, 35, 0.3);
-            }
-            
-            #wgram-logout-btn {
-                background: var(--wgram-surface);
-            }
-
-            #wgram-overlay input, #wgram-overlay textarea, #wgram-login-overlay input {
-                background-color: var(--wgram-surface);
-                border: 1px solid #495057;
-                color: var(--wgram-text);
-            }
-
-            #wgram-overlay hr {
-                border-color: var(--wgram-surface);
-            }
-
-            .wgram-toggle-switch input:checked + .wgram-toggle-slider {
-                background: var(--wgram-gradient);
-            }
-
-            #wgram-projects-overlay {
-                background: rgba(33, 37, 41, 0.75);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.18);
-                color: var(--wgram-text);
-                z-index: 10000;
-            }
-
-            #wgram-projects-header {
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            
-            #wgram-projects-header h2 {
-                background: var(--wgram-gradient);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-
-            .wgram-project-item {
-                border-bottom: 1px solid var(--wgram-surface);
-                transition: background-color 0.2s ease;
-            }
-
-            .wgram-project-item:hover {
-                background-color: rgba(255, 255, 255, 0.05);
-            }
-
-            .wgram-project-item:last-child {
-                border-bottom: none;
-            }
-        `;
-        GM_addStyle(customCSS);
+    injectCSS() {
         try { 
             const css = GM_getResourceText('WGRAM_CSS'); 
             if (css) { 

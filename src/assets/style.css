@@ -107,7 +107,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0; /* Impede que o flex item cresça demais */
-    flex-shrink: 1; /* Permite que o item encolha */
+    flex: 1; /* Permite que o item encolha e cresça */
 }
 
 #wgram-user-info small {
