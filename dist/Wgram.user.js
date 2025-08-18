@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.6
+// @version      2.0.0
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -55,6 +55,7 @@
     addHr(additionalProperties = {}, callback = () => {}) { const hr = this.#createElement('hr', {}, additionalProperties); callback(this, hr); return this; }
     addButton(additionalProperties = {}, callback = () => {}) { const button = this.#createElement('button', {}, additionalProperties); callback(this, button); return this; }
     addInput(additionalProperties = {}, callback = () => {}) { const input = this.#createElement('input', {}, additionalProperties); callback(this, input); return this; }
+    addSelect(additionalProperties = {}, callback = () => {}) { const select = this.#createElement('select', {}, additionalProperties); callback(this, select); return this; }
     addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
     addLabel(additionalProperties = {}, callback = () => {}) { const label = this.#createElement('label', {}, additionalProperties); callback(this, label); return this; }
   }
@@ -79,8 +80,9 @@
         this.outputStatusId = 'wgram-output-status';
         this.isWaitingForCoords = false;
         this.coordCheckInterval = null;
+        this.userProjects = []; // Armazena os projetos do usuário
     }
-    updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
+    updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
     displayStatus(text) { console.info(`[${this.name}] Status: ${text}`); this.updateElement(this.outputStatusId, `Status: ${text}`, true); }
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
@@ -141,28 +143,26 @@
             .buildElement()
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
+                // Seção Meus Projetos
+                .addHeader(4, { textContent: 'Meus Projetos' }).buildElement()
+                .addSelect({ id: 'wgram-project-selector' })
+                    .addP({ tagName: 'option', value: '', textContent: 'Carregando projetos...' }) // Placeholder
+                .buildElement()
+                .addButton({ id: 'wgram-btn-load-selected', innerHTML: '<i class="fas fa-check"></i> Carregar Selecionado' }, (_, btn) => { btn.onclick = () => this.#handleLoad(); })
+                .buildElement()
+                .addHr({ style: 'margin: 15px 0;' }).buildElement()
+                // Seção Carregar por ID
+                .addHeader(4, { textContent: 'Carregar por ID Público' }).buildElement()
                 .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' }).buildElement()
-                .addDiv({ id: 'wgram-project-info' })
-                    .addP({ id: 'wgram-info-name' }).buildElement()
-                    .addP({ id: 'wgram-info-creator' }).buildElement()
-                    .addP({ id: 'wgram-info-pixels' }).buildElement()
-                    .addP({ id: 'wgram-info-coords' }).buildElement()
-                .buildElement()
-                .addDiv({ id: 'wgram-coords-container', style: 'display: none;' })
-                    .addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement()
-                    .addInput({ type: 'number', id: 'wgram-input-ty', placeholder: 'Tl Y' }).buildElement()
-                    .addInput({ type: 'number', id: 'wgram-input-px', placeholder: 'Px X' }).buildElement()
-                    .addInput({ type: 'number', id: 'wgram-input-py', placeholder: 'Px Y' }).buildElement()
-                .buildElement()
                 .addDiv({ id: 'wgram-template-buttons' })
-                    .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
+                    .addButton({ id: 'wgram-btn-load-id', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoad(true); })
                     .buildElement()
                     .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); })
                     .buildElement()
                 .buildElement()
                 .addSmall({
                     id: 'wgram-site-promo',
-                    innerHTML: 'Não tem um ID? Visite <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
+                    innerHTML: 'Crie seus projetos em <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
                 }).buildElement()
             .buildElement()
             .addHr().buildElement()
@@ -189,6 +189,37 @@
         this.handleDrag('wgram-overlay', 'wgram-drag-handle');
         this.#setupSettingsListeners();
     }
+    
+    populateProjectSelector(projects) {
+        this.userProjects = projects; // Armazena a lista completa
+        const selector = document.getElementById('wgram-project-selector');
+        if (!selector) return;
+
+        selector.innerHTML = ''; // Limpa o placeholder
+
+        if (projects.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Nenhum projeto encontrado';
+            option.disabled = true;
+            selector.appendChild(option);
+            return;
+        }
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Selecione um de seus projetos...';
+        selector.appendChild(defaultOption);
+
+        projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.id;
+            const pixelCount = project.calculations?.totalPixels?.toLocaleString('pt-BR') || 'N/A';
+            option.textContent = `${project.name} (${pixelCount} pixels)`;
+            selector.appendChild(option);
+        });
+    }
+
     #setupSettingsListeners() {
         const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
         if (clearLpToggle) {
@@ -205,11 +236,35 @@
             });
         }
     }
-    #handleLoadProject() {
-        const projectId = document.getElementById('wgram-project-id').value.trim();
-        if (!projectId) { return this.displayError("Por favor, insira um ID."); }
-        this.templateManager.loadItemFromFirestore(projectId);
+    
+    #handleLoad(forceIdLoad = false) {
+        const selector = document.getElementById('wgram-project-selector');
+        const projectIdFromInput = document.getElementById('wgram-project-id').value.trim();
+        const selectedProjectId = selector.value;
+
+        if (forceIdLoad) {
+            if (!projectIdFromInput) {
+                return this.displayError("Por favor, insira um ID para carregar.");
+            }
+            this.templateManager.loadItemFromFirestore(projectIdFromInput);
+            return;
+        }
+
+        if (selectedProjectId) {
+            const selectedProject = this.userProjects.find(p => p.id === selectedProjectId);
+            if (selectedProject) {
+                this.templateManager.loadProjectFromData(selectedProject);
+            } else {
+                this.displayError("Projeto selecionado não encontrado. Tente recarregar.");
+            }
+        } else if (projectIdFromInput) {
+             this.displayStatus("Usando ID do campo de texto, pois nenhum projeto foi selecionado.");
+             this.templateManager.loadItemFromFirestore(projectIdFromInput);
+        } else {
+            return this.displayError("Selecione um projeto da lista ou insira um ID.");
+        }
     }
+
     #handleCopyCoordsId() {
         if (this.isWaitingForCoords) {
             clearInterval(this.coordCheckInterval);
@@ -260,32 +315,10 @@
             }
         }, 500);
     }
-    toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
-    displayProjectInfo(project) {
-        const infoContainer = document.getElementById('wgram-project-info');
-        const coordsContainer = document.getElementById('wgram-info-coords');
-        if (infoContainer) {
-            this.updateElement('wgram-info-name', `<i class="fa-solid fa-file-signature fa-fw"></i> <strong>Nome:</strong> <span>${project.name}</span>`);
-            this.updateElement('wgram-info-creator', `<i class="fa-solid fa-user fa-fw"></i> <strong>Criador:</strong> <span>${project.owner}</span>`);
-            this.updateElement('wgram-info-pixels', `<i class="fa-solid fa-th fa-fw"></i> <strong>Píxeis:</strong> <span>${project.pixels.toLocaleString('pt-BR')}</span>`);
-            if (project.coords) {
-                this.updateElement('wgram-info-coords', `<i class="fa-solid fa-map-marker-alt fa-fw"></i> <strong>Coords:</strong> <span>${project.coords.join(', ')}</span>`);
-                coordsContainer.style.display = 'flex';
-            } else {
-                coordsContainer.style.display = 'none';
-            }
-            infoContainer.classList.add('visible');
-        }
-    }
-    hideInfoAndCoords() {
-        const infoContainer = document.getElementById('wgram-project-info');
-        if (infoContainer) infoContainer.classList.remove('visible');
-        this.toggleCoordsFields(false);
-    }
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
   }
 
-  // --- Módulo: src/core/AuthManager.js (CORRIGIDO) ---
+  // --- Módulo: src/core/AuthManager.js ---
   class AuthManager {
       constructor(config, uiManager) { this.uiManager = uiManager; try { this.firebaseApp = firebase.initializeApp(config); this.auth = firebase.auth(); this.db = firebase.firestore(); } catch (e) { console.error("Erro ao inicializar o Firebase.", e); alert("Falha ao conectar com o Firebase."); } }
       onAuthStateChanged(callback) { this.auth.onAuthStateChanged(callback); }
@@ -348,7 +381,30 @@
             return null;
         }
       }
-async saveAndCopyCoordsId(coords) {
+    
+      async getUserProjects() {
+        const user = this.auth.currentUser;
+        if (!user) {
+            this.uiManager.displayError("Usuário não está logado para buscar projetos.");
+            return [];
+        }
+        try {
+            const projectsRef = this.db.collection('users').doc(user.uid).collection('projects');
+            const snapshot = await projectsRef.get();
+            if (snapshot.empty) {
+                console.log("Nenhum projeto encontrado para este usuário.");
+                return [];
+            }
+            const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return projects;
+        } catch (error) {
+            this.uiManager.displayError("Falha ao buscar projetos do usuário.");
+            console.error("Erro ao buscar projetos:", error);
+            return [];
+        }
+    }
+
+    async saveAndCopyCoordsId(coords) {
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
 
@@ -410,76 +466,107 @@ async saveAndCopyCoordsId(coords) {
     }
   }
 
-  // --- Módulo: src/core/TemplateManager.js (CORRIGIDO) ---
+  // --- Módulo: src/core/TemplateManager.js ---
   class TemplateManager {
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
-async loadItemFromFirestore(id) {
-    this.uiManager.displayStatus(`A procurar ID ${id}...`);
-    this.uiManager.hideInfoAndCoords();
-
-    const projectDocRef = this.authManager.db.collection('publicProjects').doc(id);
-    let docSnap = await projectDocRef.get();
-
-    if (!docSnap.exists) {
-        const coordsDocRef = this.authManager.db.collection('sharedCoords').doc(id);
-        docSnap = await coordsDocRef.get();
-    }
-
-    if (!docSnap.exists) {
-        return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
-    }
-
-    const data = docSnap.data();
-
-    const redirectUrl = data.coordinates ? data.coordinates.url : null;
-
-    if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
-        this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
-        sessionStorage.setItem('wgram_pending_load', id);
-        window.location.href = redirectUrl;
-        return; 
-    }
-
-    if (data.processedImageBase64) {
-        await this.loadProject(docSnap);
-    } 
-    else if (data.coords) {
-        await this.loadCoords(docSnap);
-    }
-}
-    async loadProject(doc) {
-        const projectData = doc.data();
-        const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
-        if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
-        const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
-        this.uiManager.displayProjectInfo({ name: name, owner: ownerName, pixels: calculations.totalPixels, coords: coordsArray });
-        await doc.ref.update({ loads: firebase.firestore.FieldValue.increment(1) });
-        if (coordsArray) {
-            this.uiManager.toggleCoordsFields(false);
-            await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
+    
+    async loadProjectFromData(projectData) {
+        this.uiManager.displayStatus(`Carregando seu projeto "${projectData.name}"...`);
+        
+        // Constrói a URL de redirecionamento a partir das coordenadas do projeto
+        const coords = projectData.coordinates;
+        let redirectUrl = null;
+        if (coords && coords.lat && coords.lng && coords.zoom) {
+             redirectUrl = `https://wplace.live/?lat=${coords.lat}&lng=${coords.lng}&zoom=${coords.zoom}`;
         } else {
-            this.uiManager.displayError("Projeto não tem coordenadas. Por favor, insira-as.");
-            this.uiManager.toggleCoordsFields(true);
-            const loadBtn = document.getElementById('wgram-btn-load');
-            const tempListener = async () => {
-                const tx = document.getElementById('wgram-input-tx').value; const ty = document.getElementById('wgram-input-ty').value;
-                const px = document.getElementById('wgram-input-px').value; const py = document.getElementById('wgram-input-py').value;
-                if (!tx || !ty || !px || !py) { return this.uiManager.displayError('Coordenadas incompletas.'); }
-                const manualCoordsArray = [tx, ty, px, py].map(Number);
-                await this.createTemplateFromBase64(processedImageBase64, name, manualCoordsArray);
-                loadBtn.removeEventListener('click', tempListener);
-            };
-            loadBtn.addEventListener('click', tempListener);
+            this.uiManager.displayError("Este projeto não tem coordenadas geográficas salvas. Não é possível redirecionar.");
+            // Mesmo sem coordenadas geográficas, tentamos carregar o template se o usuário já estiver no local certo
+        }
+
+        // Lógica de redirecionamento
+        if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
+            this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
+            // Usamos o ID do projeto para o carregamento pendente
+            sessionStorage.setItem('wgram_pending_load', projectData.id);
+            sessionStorage.setItem('wgram_pending_load_type', 'private'); // Indica que é um projeto privado
+            window.location.href = redirectUrl;
+            return;
+        }
+
+        // Se não precisar redirecionar, carrega o template diretamente
+        await this.loadProject(projectData);
+    }
+
+    async loadItemFromFirestore(id) {
+        this.uiManager.displayStatus(`A procurar ID público ${id}...`);
+
+        // Primeiro, tenta carregar como um projeto público
+        let docRef = this.authManager.db.collection('publicProjects').doc(id);
+        let docSnap = await docRef.get();
+
+        // Se não encontrar, tenta carregar como coordenadas compartilhadas
+        if (!docSnap.exists) {
+            docRef = this.authManager.db.collection('sharedCoords').doc(id);
+            docSnap = await docRef.get();
+        }
+
+        if (!docSnap.exists) {
+            return this.uiManager.displayError("Nenhum projeto público ou coordenadas encontrados com este ID.");
+        }
+
+        const data = docSnap.data();
+        
+        // Lógica de redirecionamento para o item público
+        const coords = data.coordinates || data.coords; // Suporta ambos os formatos
+        let redirectUrl = null;
+        if (coords && coords.lat && coords.lng && coords.zoom) {
+             redirectUrl = `https://wplace.live/?lat=${coords.lat}&lng=${coords.lng}&zoom=${coords.zoom}`;
+        } else if (data.locationUrl) {
+             redirectUrl = data.locationUrl;
+        }
+
+        if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
+            this.uiManager.displayStatus(`Redirecionando para a localização do item...`);
+            sessionStorage.setItem('wgram_pending_load', id);
+            sessionStorage.setItem('wgram_pending_load_type', 'public'); // Indica que é um item público
+            window.location.href = redirectUrl;
+            return;
+        }
+
+        // Processa o item público
+        if (data.processedImageBase64) {
+            await this.loadProject(data);
+        } else if (data.coords) { // Carrega apenas as coordenadas
+            const { tl_x, tl_y, px_x, py_y } = data.coords;
+            const url = `https://wplace.live/#/${tl_x}/${tl_y}/${px_x}/${py_y}`;
+            window.open(url, '_self');
+            this.uiManager.displayStatus(`A navegar para as coordenadas partilhadas por ${data.creatorWplaceUser}.`);
         }
     }
-    async loadCoords(doc) {
-        const data = doc.data();
-        const { coords } = data;
-        const url = `https://wplace.live/#/${coords.tl_x}/${coords.tl_y}/${coords.px_x}/${coords.py_y}`;
-        window.open(url, '_self');
-        this.uiManager.displayStatus(`A navegar para as coordenadas partilhadas por ${data.creatorWplaceUser}.`);
+
+    async loadProject(projectData) {
+        const { processedImageBase64, name, coordinates } = projectData;
+        if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
+        
+        // As coordenadas do pixel são essenciais para desenhar o template
+        if (!coordinates || coordinates.tl_x === undefined) {
+             return this.uiManager.displayError("Projeto não tem coordenadas de pixel salvas. Não é possível carregar o template.");
+        }
+        
+        const coordsArray = [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.py_y].map(Number);
+        
+        // Incrementa o contador de loads se for um projeto público
+        if (projectData.ownerId) { // Projetos públicos têm ownerId
+            const projectRef = this.authManager.db.collection('publicProjects').doc(projectData.id);
+            if (projectRef) {
+                await projectRef.update({ loads: firebase.firestore.FieldValue.increment(1) }).catch(e => console.log("Não é um projeto público, não incrementando loads."));
+            }
+        }
+        
+        await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
     }
+
     async createTemplateFromBase64(base64, name, coords) { this.uiManager.displayStatus(`A processar o template "${name}"...`); try { const template = new Template({ displayName: name, coords: coords }); await template.processImage(base64); this.templates = [template]; this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`); this.setTemplatesShouldBeDrawn(true); } catch (error) { this.uiManager.displayError(`Falha ao processar o template: ${error.message}`); console.error(error); } }
     async drawTemplateOnTile(tileBlob, tileCoords) { if (!this.templatesShouldBeDrawn || this.templates.length === 0) { return tileBlob; } const RENDER_SCALE = 3; const tileBitmap = await createImageBitmap(tileBlob); const scaledWidth = tileBitmap.width * RENDER_SCALE; const scaledHeight = tileBitmap.height * RENDER_SCALE; const canvas = new OffscreenCanvas(scaledWidth, scaledHeight); const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight); for (const template of this.templates) { const chunk = template.getChunkForTile(tileCoords); if (chunk) { ctx.drawImage(chunk.bitmap, 0, 0); } } return await canvas.convertToBlob({ type: 'image/png' }); }
     setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
@@ -569,13 +656,34 @@ async loadItemFromFirestore(id) {
                     this.templateManager.setUserId(user.uid);
                     this.injector.injectFetchSpy();
                     this.apiManager.initializeApiListener();
-
-                    const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
                     
-                    if (pendingLoadId) {
-                        console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
+                    // Buscar e popular os projetos do usuário
+                    const userProjects = await this.authManager.getUserProjects();
+                    this.uiManager.populateProjectSelector(userProjects);
+
+
+                    // Lógica de carregamento pendente
+                    const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
+                    const pendingLoadType = sessionStorage.getItem('wgram_pending_load_type');
+                    
+                    if (pendingLoadId && pendingLoadType) {
+                        console.log(`[${this.info.name}] Encontrado carregamento pendente (${pendingLoadType}) para o ID: ${pendingLoadId}`);
                         sessionStorage.removeItem('wgram_pending_load');
-                        setTimeout(() => this.templateManager.loadItemFromFirestore(pendingLoadId), 100);
+                        sessionStorage.removeItem('wgram_pending_load_type');
+
+                        setTimeout(async () => {
+                            if (pendingLoadType === 'private') {
+                                // Encontra o projeto na lista já carregada
+                                const projectToLoad = userProjects.find(p => p.id === pendingLoadId);
+                                if (projectToLoad) {
+                                    this.templateManager.loadProject(projectToLoad);
+                                } else {
+                                    this.uiManager.displayError("Não foi possível encontrar o projeto privado pendente.");
+                                }
+                            } else { // public
+                                this.templateManager.loadItemFromFirestore(pendingLoadId);
+                            }
+                        }, 500); // Um pequeno atraso para garantir que tudo esteja pronto
                     }
 
                 } else {
@@ -597,6 +705,7 @@ async loadItemFromFirestore(id) {
             .wgram-toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
             input:checked + .wgram-toggle-slider { background-color: #3b82f6; }
             input:checked + .wgram-toggle-slider:before { transform: translateX(18px); }
+            #wgram-project-selector { width: 100%; margin-bottom: 10px; }
         `;
         GM_addStyle(customCSS);
         try { 
