@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.3
+// @version      1.9.4
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.0
@@ -85,6 +85,28 @@
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
+    
+    // INÍCIO DA MODIFICAÇÃO: Nova função para buscar o nome de usuário na página
+    /**
+     * Tenta encontrar o nome de usuário do Wplace diretamente na página.
+     * @returns {string|null} O nome de usuário encontrado ou null se não for encontrado.
+     */
+    _getWplaceUsernameFromPage() {
+        const selector = "body > div:nth-child(1) > div.disable-pinch-zoom.relative.h-full.overflow-hidden.svelte-6wmtgk > div.absolute.right-2.top-2.z-30 > div > div:nth-child(1) > div > div.dropdown-content.menu.bg-base-100.rounded-box.border-base-300.z-1.relative.right-1.w-\\[min\\(100vw-24px\\,400px\\)\\].translate-y-2.border.p-4.shadow-md > section:nth-child(2) > div:nth-child(2) > div.flex.items-center.gap-1\\.5.pr-8.text-lg.font-medium > h3";
+        try {
+            const el = document.querySelector(selector);
+            if (el && el.textContent) {
+                console.log("[Wgram] Nome de usuário encontrado na página:", el.textContent.trim());
+                return el.textContent.trim();
+            }
+        } catch (error) {
+            console.error("[Wgram] Erro ao tentar buscar o nome de usuário na página:", error);
+        }
+        console.log("[Wgram] Elemento do nome de usuário não encontrado na página.");
+        return null;
+    }
+    // FIM DA MODIFICAÇÃO
+
     buildMaintenanceOverlay(message) {
         this.destroyOverlay('wgram-overlay');
         this.destroyOverlay('wgram-login-overlay');
@@ -120,7 +142,16 @@
     }
     buildMainOverlay(user, userData) {
         this.destroyOverlay('wgram-login-overlay');
-        const wplaceUsername = userData.wplaceUsername || 'Não definido';
+        
+        // INÍCIO DA MODIFICAÇÃO: Lógica aprimorada para obter o nome de usuário
+        let wplaceUsername = userData.wplaceUsername; // 1. Tenta obter do banco de dados
+
+        if (!wplaceUsername) {
+            wplaceUsername = this._getWplaceUsernameFromPage(); // 2. Se falhar, tenta obter da página
+        }
+        
+        const finalUsername = wplaceUsername || 'Não definido'; // 3. Se tudo falhar, usa "Não definido"
+        // FIM DA MODIFICAÇÃO
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
@@ -130,8 +161,8 @@
             .buildElement()
             .addHr().buildElement()
             .addDiv({ id: 'wgram-user-profile' })
-                .addDiv({ id: 'wgram-user-info' }) // Container para nome e email
-                    .addSmall({ id: 'wgram-wplace-username', textContent: wplaceUsername, style: 'font-weight: bold; font-size: 1.1em;' })
+                .addDiv({ id: 'wgram-user-info' })
+                    .addSmall({ id: 'wgram-wplace-username', textContent: finalUsername, style: 'font-weight: bold; font-size: 1.1em;' }) // Usa a variável final
                     .buildElement()
                     .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
                     .buildElement()
@@ -506,7 +537,6 @@
         }
     }
 
-    // NOVO: Função para salvar os dados da conta Wplace no Firestore
     async saveWplaceAccountData(accountData) {
         const user = this.auth.currentUser;
         if (!user) {
@@ -545,17 +575,14 @@
         this.uiManager.displayStatus(`A procurar ID ${id}...`);
         this.uiManager.hideInfoAndCoords();
 
-        // Tenta carregar de projetos públicos
         let docRef = this.authManager.db.collection('publicProjects').doc(id);
         let docSnap = await docRef.get();
 
-        // Se não encontrar, tenta carregar de projetos do usuário
         if (!docSnap.exists && this.authManager.auth.currentUser) {
             docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
             docSnap = await docRef.get();
         }
 
-        // Se ainda não encontrar, tenta carregar de coordenadas partilhadas
         if (!docSnap.exists) {
             docRef = this.authManager.db.collection('sharedCoords').doc(id);
             docSnap = await docRef.get();
@@ -592,7 +619,6 @@
 
         const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
         
-        // Apenas incrementa loads para projetos públicos
         if (doc.ref.parent.id === 'publicProjects') {
             await doc.ref.update({ loads: firebase.firestore.FieldValue.increment(1) });
         }
@@ -632,24 +658,21 @@
 
   // --- Módulo: src/core/ApiManager.js ---
   class ApiManager {
-    // MODIFICADO: Adicionado authManager ao construtor
     constructor(templateManager, uiManager, authManager) { 
         this.templateManager = templateManager; 
         this.uiManager = uiManager; 
-        this.authManager = authManager; // NOVO: Referência ao AuthManager
+        this.authManager = authManager;
         this.disableAll = false; 
         this.coordsTilePixel = []; 
     }
     initializeApiListener() { window.addEventListener('message', async (event) => { const { data } = event; if (!data || !data.isWgramMessage || data.source !== 'wgram-spy') { return; } const endpoint = this.#parseEndpoint(data.endpoint); if (endpoint === 'tiles') { await this.#handleTileResponse(data); return; } if (data.jsonData) { this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint); } }); }
     #parseEndpoint(url) { if (!url) return ''; return url.split('?')[0].split('/').filter(s => s && isNaN(Number(s)) && !s.includes('.')).pop() || ''; }
     
-    // MODIFICADO: Adicionado tratamento para o endpoint 'me'
     #handleJsonResponse(endpoint, jsonData, fullUrl) { 
         switch (endpoint) { 
             case 'pixel': 
                 this.#processPixelCoords(fullUrl); 
                 break;
-            // NOVO: Caso para capturar os dados do usuário
             case 'me':
                 this.#handleAccountInfo(jsonData);
                 break;
@@ -659,7 +682,6 @@
     #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); }
     getCurrentCoords() { return this.coordsTilePixel; }
     
-    // NOVO: Função para enviar os dados da conta para o AuthManager
     #handleAccountInfo(jsonData) {
         if (this.authManager) {
             this.authManager.saveWplaceAccountData(jsonData);
@@ -699,8 +721,6 @@
                 const url = (args[0] instanceof Request) ? args[0].url : (args[0] || '');
                 const contentType = clonedResponse.headers.get('content-type') || '';
                 if (contentType.includes('application/json')) {
-                    // Este bloco já captura TODOS os JSONs, incluindo o de '/me'.
-                    // A lógica de filtragem será feita no ApiManager.
                     clonedResponse.json().then(jsonData => { window.postMessage({ isWgramMessage: true, source: SPY_SOURCE, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${SCRIPT_NAME}] Erro ao processar JSON:`, err); });
                 } else if (contentType.includes('image/') && !url.includes('openfreemap') && !url.includes('maps')) {
                     const blob = await clonedResponse.blob();
@@ -727,10 +747,7 @@
         this.uiManager = new UIManager(this.info.name, this.info.version); 
         this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); 
         this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); 
-        
-        // MODIFICADO: Passando o authManager para o ApiManager
         this.apiManager = new ApiManager(this.templateManager, this.uiManager, this.authManager); 
-        
         this.injector = new Injector(); 
         this.uiManager.authManager = this.authManager; 
         this.uiManager.templateManager = this.templateManager; 
@@ -752,7 +769,6 @@
                     const userData = await this.authManager.getUserData();
                     const userSettings = userData ? (userData.settings || {}) : {};
 
-                    // Construir a UI primeiro
                     this.uiManager.buildMainOverlay(user, userData || {});
                     
                     if (userSettings && userSettings.autoClearLp) {
