@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.3
+// @version      1.9.4
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -125,7 +125,7 @@
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
                 .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                .addImg({ alt: 'Ícone do Wgram', src: 'https://github.com/rm0ntoya/wgram-wplace/blob/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
+                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
             .addHr().buildElement()
