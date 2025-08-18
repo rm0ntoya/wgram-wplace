@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.9
+// @version      1.9.0
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -673,6 +673,9 @@ async loadItemFromFirestore(id) {
                     
                     const userData = await this.authManager.getUserData();
                     const userSettings = userData ? (userData.settings || {}) : {};
+
+                    // Construir a UI primeiro
+                    this.uiManager.buildMainOverlay(user, userData || {});
                     
                     if (userSettings && userSettings.autoClearLp) {
                         if (localStorage.getItem('lp')) {
@@ -681,7 +684,6 @@ async loadItemFromFirestore(id) {
                         }
                     }
 
-                    this.uiManager.buildMainOverlay(user, userData || {});
                     this.templateManager.setUserId(user.uid);
                     this.injector.injectFetchSpy();
                     this.apiManager.initializeApiListener();
@@ -741,4 +743,4 @@ async loadItemFromFirestore(id) {
   const wgram = new WgramScript();
   wgram.start();
 
-})
+})();
