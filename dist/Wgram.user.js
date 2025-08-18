@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      1.8.8
+// @version      1.8.9
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -180,6 +180,16 @@
                         .buildElement()
                     .buildElement()
                 .buildElement()
+                .addDiv({ className: 'wgram-setting-item' })
+                    .addSmall({ textContent: "Auto-carregar último projeto" })
+                    .buildElement()
+                    .addLabel({ className: 'wgram-toggle-switch' })
+                        .addInput({ type: 'checkbox', id: 'wgram-toggle-auto-load' })
+                        .buildElement()
+                        .addDiv({ className: 'wgram-toggle-slider' })
+                        .buildElement()
+                    .buildElement()
+                .buildElement()
             .buildElement()
             .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
             .addDiv({ id: 'wgram-credits' })
@@ -226,17 +236,34 @@
     }
     #setupSettingsListeners() {
         const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
-        if (clearLpToggle) {
+        const autoLoadToggle = document.getElementById('wgram-toggle-auto-load');
+
+        if (clearLpToggle || autoLoadToggle) {
             this.authManager.getUserSettings().then(settings => {
-                if (settings && settings.autoClearLp) {
+                if (!settings) return;
+
+                if (clearLpToggle && settings.autoClearLp) {
                     clearLpToggle.checked = true;
                 }
+                if (autoLoadToggle && settings.autoLoadLastProject) {
+                    autoLoadToggle.checked = true;
+                }
             });
+        }
 
+        if (clearLpToggle) {
             clearLpToggle.addEventListener('change', (e) => {
                 const isEnabled = e.target.checked;
                 this.authManager.updateUserSetting('autoClearLp', isEnabled);
                 this.displayStatus(`Limpeza automática de 'lp' ${isEnabled ? 'ativada' : 'desativada'}.`);
+            });
+        }
+
+        if (autoLoadToggle) {
+            autoLoadToggle.addEventListener('change', (e) => {
+                const isEnabled = e.target.checked;
+                this.authManager.updateUserSetting('autoLoadLastProject', isEnabled);
+                this.displayStatus(`Auto-carregamento ${isEnabled ? 'ativado' : 'desativado'}.`);
             });
         }
     }
@@ -362,6 +389,16 @@
             await userDocRef.set({ settings: { [key]: value } }, { merge: true });
         } catch (error) {
             console.error("Wgram: Erro ao salvar configuração do usuário:", error);
+        }
+      }
+      async updateUserLastLoadedProject(projectId) {
+        const user = this.auth.currentUser;
+        if (!user || !projectId) return;
+        const userDocRef = this.db.collection('users').doc(user.uid);
+        try {
+            await userDocRef.set({ lastLoadedProjectId: projectId }, { merge: true });
+        } catch (error) {
+            console.error("Wgram: Erro ao salvar último projeto carregado:", error);
         }
       }
       async getUserSettings() {
@@ -523,6 +560,9 @@ async loadItemFromFirestore(id) {
         const projectData = doc.data();
         const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
         if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
+        
+        await this.authManager.updateUserLastLoadedProject(doc.id);
+
         const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
         this.uiManager.displayProjectInfo({ name: name, owner: ownerName || 'Você', pixels: calculations.totalPixels, coords: coordsArray });
         
@@ -632,7 +672,7 @@ async loadItemFromFirestore(id) {
                     console.log("Utilizador logado:", user.email);
                     
                     const userData = await this.authManager.getUserData();
-                    const userSettings = userData ? userData.settings : {};
+                    const userSettings = userData ? (userData.settings || {}) : {};
                     
                     if (userSettings && userSettings.autoClearLp) {
                         if (localStorage.getItem('lp')) {
@@ -652,6 +692,10 @@ async loadItemFromFirestore(id) {
                         console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
                         sessionStorage.removeItem('wgram_pending_load');
                         setTimeout(() => this.templateManager.loadItemFromFirestore(pendingLoadId), 100);
+                    } else if (userSettings.autoLoadLastProject && userData.lastLoadedProjectId) {
+                        console.log(`[${this.info.name}] Auto-carregamento ativado. Carregando último projeto: ${userData.lastLoadedProjectId}`);
+                        this.uiManager.displayStatus(`Auto-carregando último projeto...`);
+                        setTimeout(() => this.templateManager.loadItemFromFirestore(userData.lastLoadedProjectId), 100);
                     }
 
                 } else {
@@ -697,4 +741,4 @@ async loadItemFromFirestore(id) {
   const wgram = new WgramScript();
   wgram.start();
 
-})();
+})
