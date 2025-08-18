@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      2.0.0
+// @version      2.0.1
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -56,6 +56,7 @@
     addButton(additionalProperties = {}, callback = () => {}) { const button = this.#createElement('button', {}, additionalProperties); callback(this, button); return this; }
     addInput(additionalProperties = {}, callback = () => {}) { const input = this.#createElement('input', {}, additionalProperties); callback(this, input); return this; }
     addSelect(additionalProperties = {}, callback = () => {}) { const select = this.#createElement('select', {}, additionalProperties); callback(this, select); return this; }
+    addOption(additionalProperties = {}, callback = () => {}) { const option = this.#createElement('option', {}, additionalProperties); callback(this, option); return this; } // CORREÇÃO: Adicionado método para criar <option>
     addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
     addLabel(additionalProperties = {}, callback = () => {}) { const label = this.#createElement('label', {}, additionalProperties); callback(this, label); return this; }
   }
@@ -146,7 +147,7 @@
                 // Seção Meus Projetos
                 .addHeader(4, { textContent: 'Meus Projetos' }).buildElement()
                 .addSelect({ id: 'wgram-project-selector' })
-                    .addP({ tagName: 'option', value: '', textContent: 'Carregando projetos...' }) // Placeholder
+                    .addOption({ value: '', textContent: 'Carregando projetos...' }) // CORREÇÃO: Usando addOption em vez de addP
                 .buildElement()
                 .addButton({ id: 'wgram-btn-load-selected', innerHTML: '<i class="fas fa-check"></i> Carregar Selecionado' }, (_, btn) => { btn.onclick = () => this.#handleLoad(); })
                 .buildElement()
