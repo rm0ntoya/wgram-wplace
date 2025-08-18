@@ -125,7 +125,7 @@
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
                 .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                .addImg({ alt: 'Ícone do Wgram', src: 'https://i.imgur.com/8a0oG4A.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
+                .addImg({ alt: 'Ícone do Wgram', src: 'https://github.com/rm0ntoya/wgram-wplace/blob/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
             .addHr().buildElement()
