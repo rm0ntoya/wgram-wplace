@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      2.0.3
+// @version      2.0.4
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -44,41 +44,21 @@
   // --- Módulo: src/components/Overlay.js ---
   class Overlay {
     constructor() { this.overlay = null; this.currentParent = null; this.parentStack = []; }
-    
-    #createElement(tag, isContainer, properties = {}, additionalProperties = {}) {
-        const element = document.createElement(tag);
-        for (const [property, value] of Object.entries(properties)) { element[property] = value; }
-        for (const [property, value] of Object.entries(additionalProperties)) { element[property] = value; }
-
-        if (!this.overlay) {
-            this.overlay = element;
-            this.currentParent = element;
-        } else {
-            this.currentParent?.appendChild(element);
-            if (isContainer) {
-                this.parentStack.push(this.currentParent);
-                this.currentParent = element;
-            }
-        }
-        return element;
-    }
-
+    #createElement(tag, properties = {}, additionalProperties = {}) { const element = document.createElement(tag); if (!this.overlay) { this.overlay = element; this.currentParent = element; } else { this.currentParent?.appendChild(element); this.parentStack.push(this.currentParent); this.currentParent = element; } for (const [property, value] of Object.entries(properties)) { element[property] = value; } for (const [property, value] of Object.entries(additionalProperties)) { element[property] = value; } return element; }
     buildElement() { if (this.parentStack.length > 0) { this.currentParent = this.parentStack.pop(); } return this; }
     buildOverlay(parent) { if (this.overlay && parent) { parent.appendChild(this.overlay); } this.overlay = null; this.currentParent = null; this.parentStack = []; }
-    
-    addDiv(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('div', true, {}, additionalProperties); callback(this, el); return this; }
-    addP(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('p', true, {}, additionalProperties); callback(this, el); return this; }
-    addSmall(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('small', true, {}, additionalProperties); callback(this, el); return this; }
-    addHeader(level, additionalProperties = {}, callback = () => {}) { const el = this.#createElement(`h${level}`, true, {}, additionalProperties); callback(this, el); return this; }
-    addSelect(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('select', true, {}, additionalProperties); callback(this, el); return this; }
-    addLabel(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('label', true, {}, additionalProperties); callback(this, el); return this; }
-    
-    addImg(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('img', false, {}, additionalProperties); callback(this, el); return this; }
-    addHr(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('hr', false, {}, additionalProperties); callback(this, el); return this; }
-    addButton(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('button', false, {}, additionalProperties); callback(this, el); return this; }
-    addInput(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('input', false, {}, additionalProperties); callback(this, el); return this; }
-    addOption(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('option', false, {}, additionalProperties); callback(this, el); return this; }
-    addTextarea(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('textarea', false, {}, additionalProperties); callback(this, el); return this; }
+    addDiv(additionalProperties = {}, callback = () => {}) { const div = this.#createElement('div', {}, additionalProperties); callback(this, div); return this; }
+    addP(additionalProperties = {}, callback = () => {}) { const p = this.#createElement('p', {}, additionalProperties); callback(this, p); return this; }
+    addSmall(additionalProperties = {}, callback = () => {}) { const small = this.#createElement('small', {}, additionalProperties); callback(this, small); return this; }
+    addImg(additionalProperties = {}, callback = () => {}) { const img = this.#createElement('img', {}, additionalProperties); callback(this, img); return this; }
+    addHeader(level, additionalProperties = {}, callback = () => {}) { const header = this.#createElement(`h${level}`, {}, additionalProperties); callback(this, header); return this; }
+    addHr(additionalProperties = {}, callback = () => {}) { const hr = this.#createElement('hr', {}, additionalProperties); callback(this, hr); return this; }
+    addButton(additionalProperties = {}, callback = () => {}) { const button = this.#createElement('button', {}, additionalProperties); callback(this, button); return this; }
+    addInput(additionalProperties = {}, callback = () => {}) { const input = this.#createElement('input', {}, additionalProperties); callback(this, input); return this; }
+    addSelect(additionalProperties = {}, callback = () => {}) { const select = this.#createElement('select', {}, additionalProperties); callback(this, select); return this; }
+    addOption(additionalProperties = {}, callback = () => {}) { const option = this.#createElement('option', {}, additionalProperties); callback(this, option); return this; } // CORREÇÃO: Adicionado método para criar <option>
+    addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
+    addLabel(additionalProperties = {}, callback = () => {}) { const label = this.#createElement('label', {}, additionalProperties); callback(this, label); return this; }
   }
 
   // --- Módulo: src/core/Template.js ---
@@ -116,9 +96,12 @@
             style: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #1f2937; color: #d1d5db; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; max-width: 400px; width: 90%; border: 1px solid #374151;`
         })
             .addDiv({ style: 'text-align: center;' })
-                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' }).buildElement()
-                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' }).buildElement()
-                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' }).buildElement()
+                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' })
+                .buildElement()
+                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' })
+                .buildElement()
+                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' })
+                .buildElement()
             .buildElement()
         .buildOverlay(document.body);
     }
@@ -126,11 +109,13 @@
         this.destroyOverlay('wgram-overlay');
         this.overlayBuilder.addDiv({ id: 'wgram-login-overlay' })
             .addHeader(2, { textContent: `Login - ${this.name}` }).buildElement()
-            .addInput({ id: 'wgram-email', type: 'email', placeholder: 'Email' })
-            .addInput({ id: 'wgram-password', type: 'password', placeholder: 'Senha' })
+            .addInput({ id: 'wgram-email', type: 'email', placeholder: 'Email' }).buildElement()
+            .addInput({ id: 'wgram-password', type: 'password', placeholder: 'Senha' }).buildElement()
             .addDiv({ id: 'wgram-login-buttons' })
                 .addButton({ textContent: 'Entrar' }, (_, btn) => btn.onclick = () => this.authManager.logIn(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value))
+                .buildElement()
                 .addButton({ textContent: 'Registar' }, (_, btn) => btn.onclick = () => this.authManager.signUp(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value))
+                .buildElement()
             .buildElement()
             .addP({id: 'wgram-auth-status', textContent: 'Por favor, entre ou registe-se.'}).buildElement()
         .buildElement()
@@ -143,48 +128,62 @@
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
                 .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize()))
+                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
-            .addHr()
+            .addHr().buildElement()
             .addDiv({ id: 'wgram-user-profile' })
-                .addDiv({ id: 'wgram-user-info' })
-                    .addSmall({ id: 'wgram-wplace-username', textContent: wplaceUsername, style: 'font-weight: bold; font-size: 1.1em;' }).buildElement()
-                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' }).buildElement()
+                .addDiv({ id: 'wgram-user-info' }) // Container para nome e email
+                    .addSmall({ id: 'wgram-wplace-username', textContent: wplaceUsername, style: 'font-weight: bold; font-size: 1.1em;' })
+                    .buildElement()
+                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
+                    .buildElement()
                 .buildElement()
                 .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
+                .buildElement()
             .buildElement()
-            .addHr()
+            .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
+                // Seção Meus Projetos
                 .addHeader(4, { textContent: 'Meus Projetos' }).buildElement()
                 .addSelect({ id: 'wgram-project-selector' })
-                    .addOption({ value: '', textContent: 'Carregando projetos...' })
+                    .addOption({ value: '', textContent: 'Carregando projetos...' }) // CORREÇÃO: Usando addOption em vez de addP
                 .buildElement()
                 .addButton({ id: 'wgram-btn-load-selected', innerHTML: '<i class="fas fa-check"></i> Carregar Selecionado' }, (_, btn) => { btn.onclick = () => this.#handleLoad(); })
-                .addHr({ style: 'margin: 15px 0;' })
+                .buildElement()
+                .addHr({ style: 'margin: 15px 0;' }).buildElement()
+                // Seção Carregar por ID
                 .addHeader(4, { textContent: 'Carregar por ID Público' }).buildElement()
-                .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' })
+                .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' }).buildElement()
                 .addDiv({ id: 'wgram-template-buttons' })
                     .addButton({ id: 'wgram-btn-load-id', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoad(true); })
+                    .buildElement()
                     .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); })
+                    .buildElement()
                 .buildElement()
-                .addSmall({ id: 'wgram-site-promo', innerHTML: 'Crie seus projetos em <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>' }).buildElement()
+                .addSmall({
+                    id: 'wgram-site-promo',
+                    innerHTML: 'Crie seus projetos em <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
+                }).buildElement()
             .buildElement()
-            .addHr()
+            .addHr().buildElement()
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Limpar contas ao iniciar" }).buildElement()
+                    .addSmall({ textContent: "Limpar contas ao iniciar" })
+                    .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
                         .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
-                        .addDiv({ className: 'wgram-toggle-slider' }).buildElement()
+                        .buildElement()
+                        .addDiv({ className: 'wgram-toggle-slider' })
+                        .buildElement()
                     .buildElement()
                 .buildElement()
             .buildElement()
-            .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true })
+            .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
             .addDiv({ id: 'wgram-credits' })
-                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' }).buildElement()
-            .buildElement()
+                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' })
+                .buildElement()
         .buildElement()
         .buildOverlay(document.body);
 
@@ -193,10 +192,12 @@
     }
     
     populateProjectSelector(projects) {
-        this.userProjects = projects;
+        this.userProjects = projects; // Armazena a lista completa
         const selector = document.getElementById('wgram-project-selector');
         if (!selector) return;
-        selector.innerHTML = '';
+
+        selector.innerHTML = ''; // Limpa o placeholder
+
         if (projects.length === 0) {
             const option = document.createElement('option');
             option.value = '';
@@ -205,10 +206,12 @@
             selector.appendChild(option);
             return;
         }
+
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = 'Selecione um de seus projetos...';
         selector.appendChild(defaultOption);
+
         projects.forEach(project => {
             const option = document.createElement('option');
             option.value = project.id;
@@ -226,6 +229,7 @@
                     clearLpToggle.checked = true;
                 }
             });
+
             clearLpToggle.addEventListener('change', (e) => {
                 const isEnabled = e.target.checked;
                 this.authManager.updateUserSetting('autoClearLp', isEnabled);
@@ -238,15 +242,22 @@
         const selector = document.getElementById('wgram-project-selector');
         const projectIdFromInput = document.getElementById('wgram-project-id').value.trim();
         const selectedProjectId = selector.value;
+
         if (forceIdLoad) {
-            if (!projectIdFromInput) return this.displayError("Por favor, insira um ID para carregar.");
+            if (!projectIdFromInput) {
+                return this.displayError("Por favor, insira um ID para carregar.");
+            }
             this.templateManager.loadItemFromFirestore(projectIdFromInput);
             return;
         }
+
         if (selectedProjectId) {
             const selectedProject = this.userProjects.find(p => p.id === selectedProjectId);
-            if (selectedProject) this.templateManager.loadProjectFromData(selectedProject);
-            else this.displayError("Projeto selecionado não encontrado. Tente recarregar.");
+            if (selectedProject) {
+                this.templateManager.loadProjectFromData(selectedProject);
+            } else {
+                this.displayError("Projeto selecionado não encontrado. Tente recarregar.");
+            }
         } else if (projectIdFromInput) {
              this.displayStatus("Usando ID do campo de texto, pois nenhum projeto foi selecionado.");
              this.templateManager.loadItemFromFirestore(projectIdFromInput);
@@ -261,33 +272,47 @@
             this.isWaitingForCoords = false;
             this.displayStatus("Captura de coordenadas cancelada.");
             const copyBtn = document.getElementById('wgram-btn-copy-coords');
-            if (copyBtn) copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+            if (copyBtn) {
+                copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+            }
             return;
         }
+
         const initialCoords = this.apiManager.getCurrentCoords();
         if (initialCoords && initialCoords.length >= 4) {
             this.authManager.saveAndCopyCoordsId(initialCoords);
             return;
         }
+
         this.isWaitingForCoords = true;
         this.displayStatus("Aguardando clique no mapa... Clique no botão novamente para cancelar.");
+
         const copyBtn = document.getElementById('wgram-btn-copy-coords');
-        if (copyBtn) copyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Capturando...';
+        if (copyBtn) {
+            copyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Capturando...';
+        }
+
         let attempts = 0;
         const maxAttempts = 60; 
+
         this.coordCheckInterval = setInterval(() => {
             const polledCoords = this.apiManager.getCurrentCoords();
             attempts++;
+
             if (polledCoords && polledCoords.length >= 4) {
                 clearInterval(this.coordCheckInterval);
                 this.isWaitingForCoords = false;
-                if (copyBtn) copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                if (copyBtn) {
+                    copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                }
                 this.authManager.saveAndCopyCoordsId(polledCoords);
             } else if (attempts >= maxAttempts) {
                 clearInterval(this.coordCheckInterval);
                 this.isWaitingForCoords = false;
                 this.displayError("Tempo esgotado. Tente clicar no mapa e depois no botão.");
-                if (copyBtn) copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                if (copyBtn) {
+                    copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                }
             }
         }, 500);
     }
@@ -306,7 +331,10 @@
             const docRef = this.db.collection('config').doc('maintenance');
             const docSnap = await docRef.get();
             if (docSnap.exists && docSnap.data().isActive) {
-                return { isActive: true, message: docSnap.data().message || 'O script está temporariamente indisponível.' };
+                return {
+                    isActive: true,
+                    message: docSnap.data().message || 'O script está temporariamente indisponível.'
+                };
             }
             return { isActive: false };
         } catch (error) {
@@ -368,44 +396,33 @@
                 console.log("Nenhum projeto encontrado para este usuário.");
                 return [];
             }
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return projects;
         } catch (error) {
             this.uiManager.displayError("Falha ao buscar projetos do usuário.");
             console.error("Erro ao buscar projetos:", error);
             return [];
-        }
-      }
-      
-      // CORREÇÃO: Nova função para buscar um projeto privado específico por ID
-      async getUserProjectById(projectId) {
-        const user = this.auth.currentUser;
-        if (!user) return null;
-        try {
-            const projectRef = this.db.collection('users').doc(user.uid).collection('projects').doc(projectId);
-            const docSnap = await projectRef.get();
-            if (docSnap.exists) {
-                return { id: docSnap.id, ...docSnap.data() };
-            }
-            console.warn(`Projeto privado com ID ${projectId} não encontrado.`);
-            return null;
-        } catch (error) {
-            this.uiManager.displayError("Falha ao buscar projeto privado por ID.");
-            console.error("Erro ao buscar projeto privado:", error);
-            return null;
         }
     }
 
     async saveAndCopyCoordsId(coords) {
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
-        let locationLat = null, locationLng = null, locationZoom = null, locationUrl = null;
+
+        let locationLat = null;
+        let locationLng = null;
+        let locationZoom = null;
+        let locationUrl = null;
+
         try {
             const locationString = localStorage.getItem('location');
             if (locationString) {
                 const locationData = JSON.parse(locationString);
+                
                 locationLat = locationData.lat || null;
                 locationLng = locationData.lng || null;
                 locationZoom = locationData.zoom || null;
+
                 if (locationLat && locationLng && locationZoom) {
                     locationUrl = `https://wplace.live/?lat=${locationLat}&lng=${locationLng}&zoom=${locationZoom}`;
                 }
@@ -413,23 +430,36 @@
         } catch (e) {
             console.error("Wgram: Erro ao ler ou analisar 'location' do localStorage.", e);
         }
+
         const hexId = Math.random().toString(16).substr(2, 8);
         const userDocRef = this.db.collection('users').doc(user.uid);
+        
         try {
             const userDoc = await userDocRef.get();
             const wplaceUsername = userDoc.exists ? userDoc.data().wplaceUsername : 'Desconhecido';
+
             const coordsData = {
-                coords: { tl_x: coords[0], tl_y: coords[1], px_x: coords[2], px_y: coords[3] },
-                location: { lat: locationLat, lng: locationLng, zoom: locationZoom },
+                coords: {
+                    tl_x: coords[0], tl_y: coords[1],
+                    px_x: coords[2], px_y: coords[3],
+                },
+                location: {
+                    lat: locationLat,
+                    lng: locationLng,
+                    zoom: locationZoom
+                },
                 locationUrl: locationUrl,
                 creatorId: user.uid,
                 creatorEmail: user.email,
                 creatorWplaceUser: wplaceUsername,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+
             await this.db.collection('sharedCoords').doc(hexId).set(coordsData);
+            
             navigator.clipboard.writeText(hexId);
             this.uiManager.displayStatus(`ID de Coordenadas "${hexId}" copiado!`);
+
         } catch (error) {
             this.uiManager.displayError("Falha ao salvar coordenadas.");
             console.error(error);
@@ -444,52 +474,71 @@
     
     async loadProjectFromData(projectData) {
         this.uiManager.displayStatus(`Carregando seu projeto "${projectData.name}"...`);
+        
+        // Constrói a URL de redirecionamento a partir das coordenadas do projeto
         const coords = projectData.coordinates;
         let redirectUrl = null;
         if (coords && coords.lat && coords.lng && coords.zoom) {
              redirectUrl = `https://wplace.live/?lat=${coords.lat}&lng=${coords.lng}&zoom=${coords.zoom}`;
         } else {
             this.uiManager.displayError("Este projeto não tem coordenadas geográficas salvas. Não é possível redirecionar.");
+            // Mesmo sem coordenadas geográficas, tentamos carregar o template se o usuário já estiver no local certo
         }
+
+        // Lógica de redirecionamento
         if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
             this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
+            // Usamos o ID do projeto para o carregamento pendente
             sessionStorage.setItem('wgram_pending_load', projectData.id);
-            sessionStorage.setItem('wgram_pending_load_type', 'private');
+            sessionStorage.setItem('wgram_pending_load_type', 'private'); // Indica que é um projeto privado
             window.location.href = redirectUrl;
             return;
         }
+
+        // Se não precisar redirecionar, carrega o template diretamente
         await this.loadProject(projectData);
     }
 
     async loadItemFromFirestore(id) {
         this.uiManager.displayStatus(`A procurar ID público ${id}...`);
+
+        // Primeiro, tenta carregar como um projeto público
         let docRef = this.authManager.db.collection('publicProjects').doc(id);
         let docSnap = await docRef.get();
+
+        // Se não encontrar, tenta carregar como coordenadas compartilhadas
         if (!docSnap.exists) {
             docRef = this.authManager.db.collection('sharedCoords').doc(id);
             docSnap = await docRef.get();
         }
+
         if (!docSnap.exists) {
             return this.uiManager.displayError("Nenhum projeto público ou coordenadas encontrados com este ID.");
         }
+
         const data = docSnap.data();
-        const coords = data.coordinates || data.coords;
+        
+        // Lógica de redirecionamento para o item público
+        const coords = data.coordinates || data.coords; // Suporta ambos os formatos
         let redirectUrl = null;
         if (coords && coords.lat && coords.lng && coords.zoom) {
              redirectUrl = `https://wplace.live/?lat=${coords.lat}&lng=${coords.lng}&zoom=${coords.zoom}`;
         } else if (data.locationUrl) {
              redirectUrl = data.locationUrl;
         }
+
         if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
             this.uiManager.displayStatus(`Redirecionando para a localização do item...`);
             sessionStorage.setItem('wgram_pending_load', id);
-            sessionStorage.setItem('wgram_pending_load_type', 'public');
+            sessionStorage.setItem('wgram_pending_load_type', 'public'); // Indica que é um item público
             window.location.href = redirectUrl;
             return;
         }
+
+        // Processa o item público
         if (data.processedImageBase64) {
             await this.loadProject(data);
-        } else if (data.coords) {
+        } else if (data.coords) { // Carrega apenas as coordenadas
             const { tl_x, tl_y, px_x, py_y } = data.coords;
             const url = `https://wplace.live/#/${tl_x}/${tl_y}/${px_x}/${py_y}`;
             window.open(url, '_self');
@@ -498,17 +547,21 @@
     }
 
     async loadProject(projectData) {
-        const { processedImageBase64, name, coordinates, id } = projectData;
-        if (!processedImageBase64) return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template.");
-        if (!coordinates || coordinates.tl_x === undefined) return this.uiManager.displayError("Projeto não tem coordenadas de pixel salvas. Não é possível carregar o template.");
+        const { processedImageBase64, name, coordinates } = projectData;
+        if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
+        
+        // As coordenadas do pixel são essenciais para desenhar o template
+        if (!coordinates || coordinates.tl_x === undefined) {
+             return this.uiManager.displayError("Projeto não tem coordenadas de pixel salvas. Não é possível carregar o template.");
+        }
         
         const coordsArray = [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.py_y].map(Number);
         
-        // A verificação de `ownerId` ajuda a identificar se é um projeto originalmente público
-        if (projectData.ownerId) {
-            const projectRef = this.authManager.db.collection('publicProjects').doc(id);
+        // Incrementa o contador de loads se for um projeto público
+        if (projectData.ownerId) { // Projetos públicos têm ownerId
+            const projectRef = this.authManager.db.collection('publicProjects').doc(projectData.id);
             if (projectRef) {
-                projectRef.update({ loads: firebase.firestore.FieldValue.increment(1) }).catch(e => console.log("Projeto não encontrado na coleção pública para incrementar loads."));
+                await projectRef.update({ loads: firebase.firestore.FieldValue.increment(1) }).catch(e => console.log("Não é um projeto público, não incrementando loads."));
             }
         }
         
@@ -605,9 +658,12 @@
                     this.injector.injectFetchSpy();
                     this.apiManager.initializeApiListener();
                     
+                    // Buscar e popular os projetos do usuário
                     const userProjects = await this.authManager.getUserProjects();
                     this.uiManager.populateProjectSelector(userProjects);
 
+
+                    // Lógica de carregamento pendente
                     const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
                     const pendingLoadType = sessionStorage.getItem('wgram_pending_load_type');
                     
@@ -617,18 +673,18 @@
                         sessionStorage.removeItem('wgram_pending_load_type');
 
                         setTimeout(async () => {
-                            // CORREÇÃO: Lógica de carregamento pendente ajustada
                             if (pendingLoadType === 'private') {
-                                const projectToLoad = await this.authManager.getUserProjectById(pendingLoadId);
+                                // Encontra o projeto na lista já carregada
+                                const projectToLoad = userProjects.find(p => p.id === pendingLoadId);
                                 if (projectToLoad) {
                                     this.templateManager.loadProject(projectToLoad);
                                 } else {
-                                    this.uiManager.displayError("Não foi possível carregar o projeto privado pendente. Ele pode ter sido excluído.");
+                                    this.uiManager.displayError("Não foi possível encontrar o projeto privado pendente.");
                                 }
                             } else { // public
                                 this.templateManager.loadItemFromFirestore(pendingLoadId);
                             }
-                        }, 500);
+                        }, 500); // Um pequeno atraso para garantir que tudo esteja pronto
                     }
 
                 } else {
