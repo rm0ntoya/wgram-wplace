@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram
 // @namespace    https://github.com/rm0ntoya
-// @version      2.0.1
+// @version      2.0.2
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram.
 // @author       rm0ntoya
 // @license      MPL-2.0
@@ -44,21 +44,45 @@
   // --- Módulo: src/components/Overlay.js ---
   class Overlay {
     constructor() { this.overlay = null; this.currentParent = null; this.parentStack = []; }
-    #createElement(tag, properties = {}, additionalProperties = {}) { const element = document.createElement(tag); if (!this.overlay) { this.overlay = element; this.currentParent = element; } else { this.currentParent?.appendChild(element); this.parentStack.push(this.currentParent); this.currentParent = element; } for (const [property, value] of Object.entries(properties)) { element[property] = value; } for (const [property, value] of Object.entries(additionalProperties)) { element[property] = value; } return element; }
+    
+    // CORREÇÃO: Lógica do construtor de elementos refatorada para ser mais robusta
+    #createElement(tag, isContainer, properties = {}, additionalProperties = {}) {
+        const element = document.createElement(tag);
+        // Aplica propriedades
+        for (const [property, value] of Object.entries(properties)) { element[property] = value; }
+        for (const [property, value] of Object.entries(additionalProperties)) { element[property] = value; }
+
+        if (!this.overlay) {
+            this.overlay = element;
+            this.currentParent = element;
+        } else {
+            this.currentParent?.appendChild(element);
+            if (isContainer) {
+                this.parentStack.push(this.currentParent);
+                this.currentParent = element;
+            }
+        }
+        return element;
+    }
+
     buildElement() { if (this.parentStack.length > 0) { this.currentParent = this.parentStack.pop(); } return this; }
     buildOverlay(parent) { if (this.overlay && parent) { parent.appendChild(this.overlay); } this.overlay = null; this.currentParent = null; this.parentStack = []; }
-    addDiv(additionalProperties = {}, callback = () => {}) { const div = this.#createElement('div', {}, additionalProperties); callback(this, div); return this; }
-    addP(additionalProperties = {}, callback = () => {}) { const p = this.#createElement('p', {}, additionalProperties); callback(this, p); return this; }
-    addSmall(additionalProperties = {}, callback = () => {}) { const small = this.#createElement('small', {}, additionalProperties); callback(this, small); return this; }
-    addImg(additionalProperties = {}, callback = () => {}) { const img = this.#createElement('img', {}, additionalProperties); callback(this, img); return this; }
-    addHeader(level, additionalProperties = {}, callback = () => {}) { const header = this.#createElement(`h${level}`, {}, additionalProperties); callback(this, header); return this; }
-    addHr(additionalProperties = {}, callback = () => {}) { const hr = this.#createElement('hr', {}, additionalProperties); callback(this, hr); return this; }
-    addButton(additionalProperties = {}, callback = () => {}) { const button = this.#createElement('button', {}, additionalProperties); callback(this, button); return this; }
-    addInput(additionalProperties = {}, callback = () => {}) { const input = this.#createElement('input', {}, additionalProperties); callback(this, input); return this; }
-    addSelect(additionalProperties = {}, callback = () => {}) { const select = this.#createElement('select', {}, additionalProperties); callback(this, select); return this; }
-    addOption(additionalProperties = {}, callback = () => {}) { const option = this.#createElement('option', {}, additionalProperties); callback(this, option); return this; } // CORREÇÃO: Adicionado método para criar <option>
-    addTextarea(additionalProperties = {}, callback = () => {}) { const textarea = this.#createElement('textarea', {}, additionalProperties); callback(this, textarea); return this; }
-    addLabel(additionalProperties = {}, callback = () => {}) { const label = this.#createElement('label', {}, additionalProperties); callback(this, label); return this; }
+    
+    // Métodos de contêiner (mudam o pai atual)
+    addDiv(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('div', true, {}, additionalProperties); callback(this, el); return this; }
+    addP(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('p', true, {}, additionalProperties); callback(this, el); return this; }
+    addSmall(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('small', true, {}, additionalProperties); callback(this, el); return this; }
+    addHeader(level, additionalProperties = {}, callback = () => {}) { const el = this.#createElement(`h${level}`, true, {}, additionalProperties); callback(this, el); return this; }
+    addSelect(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('select', true, {}, additionalProperties); callback(this, el); return this; }
+    addLabel(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('label', true, {}, additionalProperties); callback(this, el); return this; }
+    
+    // Métodos de folha (não mudam o pai atual)
+    addImg(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('img', false, {}, additionalProperties); callback(this, el); return this; }
+    addHr(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('hr', false, {}, additionalProperties); callback(this, el); return this; }
+    addButton(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('button', false, {}, additionalProperties); callback(this, el); return this; }
+    addInput(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('input', false, {}, additionalProperties); callback(this, el); return this; }
+    addOption(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('option', false, {}, additionalProperties); callback(this, el); return this; }
+    addTextarea(additionalProperties = {}, callback = () => {}) { const el = this.#createElement('textarea', false, {}, additionalProperties); callback(this, el); return this; }
   }
 
   // --- Módulo: src/core/Template.js ---
@@ -96,12 +120,9 @@
             style: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #1f2937; color: #d1d5db; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; max-width: 400px; width: 90%; border: 1px solid #374151;`
         })
             .addDiv({ style: 'text-align: center;' })
-                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' })
-                .buildElement()
-                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' })
-                .buildElement()
-                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' })
-                .buildElement()
+                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' }).buildElement()
+                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' }).buildElement()
+                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' }).buildElement()
             .buildElement()
         .buildOverlay(document.body);
     }
@@ -109,13 +130,11 @@
         this.destroyOverlay('wgram-overlay');
         this.overlayBuilder.addDiv({ id: 'wgram-login-overlay' })
             .addHeader(2, { textContent: `Login - ${this.name}` }).buildElement()
-            .addInput({ id: 'wgram-email', type: 'email', placeholder: 'Email' }).buildElement()
-            .addInput({ id: 'wgram-password', type: 'password', placeholder: 'Senha' }).buildElement()
+            .addInput({ id: 'wgram-email', type: 'email', placeholder: 'Email' })
+            .addInput({ id: 'wgram-password', type: 'password', placeholder: 'Senha' })
             .addDiv({ id: 'wgram-login-buttons' })
                 .addButton({ textContent: 'Entrar' }, (_, btn) => btn.onclick = () => this.authManager.logIn(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value))
-                .buildElement()
                 .addButton({ textContent: 'Registar' }, (_, btn) => btn.onclick = () => this.authManager.signUp(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value))
-                .buildElement()
             .buildElement()
             .addP({id: 'wgram-auth-status', textContent: 'Por favor, entre ou registe-se.'}).buildElement()
         .buildElement()
@@ -128,62 +147,50 @@
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
                 .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
+                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize()))
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
-            .addHr().buildElement()
+            .addHr()
             .addDiv({ id: 'wgram-user-profile' })
-                .addDiv({ id: 'wgram-user-info' }) // Container para nome e email
-                    .addSmall({ id: 'wgram-wplace-username', textContent: wplaceUsername, style: 'font-weight: bold; font-size: 1.1em;' })
-                    .buildElement()
-                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
-                    .buildElement()
+                .addDiv({ id: 'wgram-user-info' })
+                    .addSmall({ id: 'wgram-wplace-username', textContent: wplaceUsername, style: 'font-weight: bold; font-size: 1.1em;' }).buildElement()
+                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' }).buildElement()
                 .buildElement()
                 .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
-                .buildElement()
             .buildElement()
-            .addHr().buildElement()
+            .addHr()
             .addDiv({ id: 'wgram-template-controls' })
                 // Seção Meus Projetos
                 .addHeader(4, { textContent: 'Meus Projetos' }).buildElement()
                 .addSelect({ id: 'wgram-project-selector' })
-                    .addOption({ value: '', textContent: 'Carregando projetos...' }) // CORREÇÃO: Usando addOption em vez de addP
+                    .addOption({ value: '', textContent: 'Carregando projetos...' })
                 .buildElement()
                 .addButton({ id: 'wgram-btn-load-selected', innerHTML: '<i class="fas fa-check"></i> Carregar Selecionado' }, (_, btn) => { btn.onclick = () => this.#handleLoad(); })
-                .buildElement()
-                .addHr({ style: 'margin: 15px 0;' }).buildElement()
+                .addHr({ style: 'margin: 15px 0;' })
                 // Seção Carregar por ID
                 .addHeader(4, { textContent: 'Carregar por ID Público' }).buildElement()
-                .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' }).buildElement()
+                .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' })
                 .addDiv({ id: 'wgram-template-buttons' })
                     .addButton({ id: 'wgram-btn-load-id', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoad(true); })
-                    .buildElement()
                     .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); })
-                    .buildElement()
                 .buildElement()
-                .addSmall({
-                    id: 'wgram-site-promo',
-                    innerHTML: 'Crie seus projetos em <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
-                }).buildElement()
+                .addSmall({ id: 'wgram-site-promo', innerHTML: 'Crie seus projetos em <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>' }).buildElement()
             .buildElement()
-            .addHr().buildElement()
+            .addHr()
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Limpar contas ao iniciar" })
-                    .buildElement()
+                    .addSmall({ textContent: "Limpar contas ao iniciar" }).buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
                         .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
-                        .buildElement()
-                        .addDiv({ className: 'wgram-toggle-slider' })
-                        .buildElement()
+                        .addDiv({ className: 'wgram-toggle-slider' }).buildElement()
                     .buildElement()
                 .buildElement()
             .buildElement()
-            .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
+            .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true })
             .addDiv({ id: 'wgram-credits' })
-                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' })
-                .buildElement()
+                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' }).buildElement()
+            .buildElement()
         .buildElement()
         .buildOverlay(document.body);
 
