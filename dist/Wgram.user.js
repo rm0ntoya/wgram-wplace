@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.4
+// @version      1.9.5
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.0
@@ -86,7 +86,6 @@
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
     
-    // INÍCIO DA MODIFICAÇÃO: Nova função para buscar o nome de usuário na página
     /**
      * Tenta encontrar o nome de usuário do Wplace diretamente na página.
      * @returns {string|null} O nome de usuário encontrado ou null se não for encontrado.
@@ -103,6 +102,26 @@
             console.error("[Wgram] Erro ao tentar buscar o nome de usuário na página:", error);
         }
         console.log("[Wgram] Elemento do nome de usuário não encontrado na página.");
+        return null;
+    }
+
+    // INÍCIO DA MODIFICAÇÃO: Nova função para buscar o dinheiro do usuário na página
+    /**
+     * Tenta encontrar o dinheiro do usuário do Wplace diretamente na página.
+     * @returns {string|null} O valor encontrado ou null se não for encontrado.
+     */
+    _getWplaceMoneyFromPage() {
+        const selector = "body > div:nth-child(1) > dialog:nth-child(4) > div > div > section > div > div > button > span > span.text-primary.text-base.font-semibold";
+        try {
+            const el = document.querySelector(selector);
+            if (el && el.textContent) {
+                console.log("[Wgram] Dinheiro encontrado na página:", el.textContent.trim());
+                return el.textContent.trim();
+            }
+        } catch (error) {
+            console.error("[Wgram] Erro ao tentar buscar o dinheiro na página:", error);
+        }
+        console.log("[Wgram] Elemento do dinheiro não encontrado na página.");
         return null;
     }
     // FIM DA MODIFICAÇÃO
@@ -143,14 +162,15 @@
     buildMainOverlay(user, userData) {
         this.destroyOverlay('wgram-login-overlay');
         
-        // INÍCIO DA MODIFICAÇÃO: Lógica aprimorada para obter o nome de usuário
-        let wplaceUsername = userData.wplaceUsername; // 1. Tenta obter do banco de dados
-
+        let wplaceUsername = userData.wplaceUsername;
         if (!wplaceUsername) {
-            wplaceUsername = this._getWplaceUsernameFromPage(); // 2. Se falhar, tenta obter da página
+            wplaceUsername = this._getWplaceUsernameFromPage();
         }
-        
-        const finalUsername = wplaceUsername || 'Não definido'; // 3. Se tudo falhar, usa "Não definido"
+        const finalUsername = wplaceUsername || 'Não definido';
+
+        // INÍCIO DA MODIFICAÇÃO: Lógica para obter e formatar o dinheiro
+        const moneyAmount = this._getWplaceMoneyFromPage();
+        const finalMoneyText = moneyAmount ? `Dinheiro: ${moneyAmount}` : 'Dinheiro: N/A';
         // FIM DA MODIFICAÇÃO
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
@@ -162,10 +182,14 @@
             .addHr().buildElement()
             .addDiv({ id: 'wgram-user-profile' })
                 .addDiv({ id: 'wgram-user-info' })
-                    .addSmall({ id: 'wgram-wplace-username', textContent: finalUsername, style: 'font-weight: bold; font-size: 1.1em;' }) // Usa a variável final
+                    .addSmall({ id: 'wgram-wplace-username', textContent: finalUsername, style: 'font-weight: bold; font-size: 1.1em;' })
                     .buildElement()
                     .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
                     .buildElement()
+                    // INÍCIO DA MODIFICAÇÃO: Adicionado elemento para exibir o dinheiro
+                    .addSmall({ id: 'wgram-user-money', textContent: finalMoneyText, style: 'font-size: 0.9em; color: #6ee7b7; margin-top: 4px;' })
+                    .buildElement()
+                    // FIM DA MODIFICAÇÃO
                 .buildElement()
                 .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
                 .buildElement()
