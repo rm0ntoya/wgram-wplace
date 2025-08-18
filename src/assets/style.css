@@ -100,16 +100,32 @@
     justify-content: space-between;
     align-items: center;
     font-size: 0.9em;
+    gap: 10px;
 }
+
+#wgram-user-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* Impede que o flex item cresça demais */
+    flex-shrink: 1; /* Permite que o item encolha */
+}
+
+#wgram-user-info small {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 
 #wgram-logout-btn {
     background: var(--wgram-surface) !important;
     padding: 6px 10px;
     font-size: 0.8em;
+    flex-shrink: 0; /* Impede que o botão encolha */
 }
 
 #wgram-logout-btn:hover {
-    background: #4b5563 !important; /* bg-gray-600 */
+    background: #4b5563 !important;
 }
 
 
@@ -212,6 +228,10 @@
   font-weight: 500;
   font-family: 'Inter', sans-serif;
   font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 #wgram-overlay button:hover, #wgram-login-overlay button:hover {
@@ -323,6 +343,11 @@
 }
 
 /* Toggle Switch */
+.wgram-setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 .wgram-toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
 .wgram-toggle-switch input { opacity: 0; width: 0; height: 0; }
 .wgram-toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--wgram-surface); transition: .4s; border-radius: 22px; }
