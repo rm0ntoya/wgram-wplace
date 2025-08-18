@@ -3,13 +3,23 @@
 /* Importa a fonte 'Inter' do Google Fonts para um visual mais limpo */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+:root {
+    --wgram-pink: #d6408b;
+    --wgram-orange: #f5a623;
+    --wgram-gradient: linear-gradient(90deg, var(--wgram-pink) 0%, var(--wgram-orange) 100%);
+    --wgram-bg: #212529;
+    --wgram-surface: #343a40;
+    --wgram-text: #f8f9fa;
+    --wgram-text-muted: #adb5bd;
+}
+
 /* Estilo geral dos painéis (Login e Principal) */
 #wgram-overlay, #wgram-login-overlay {
   position: fixed;
   top: 20px;
   right: 20px;
   background-color: rgba(18, 18, 22, 0.85); /* Fundo escuro semi-transparente */
-  color: #e0e0e0; /* Cor de texto clara */
+  color: var(--wgram-text);
   padding: 16px;
   border-radius: 12px; /* Bordas mais arredondadas */
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -58,7 +68,9 @@
   font-weight: 700;
   margin: 0;
   flex-grow: 1;
-  color: #ffffff;
+  background: var(--wgram-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Alça para arrastar */
@@ -91,13 +103,13 @@
 }
 
 #wgram-logout-btn {
-    background: #374151; /* bg-gray-700 */
+    background: var(--wgram-surface) !important;
     padding: 6px 10px;
     font-size: 0.8em;
 }
 
 #wgram-logout-btn:hover {
-    background: #4b5563; /* bg-gray-600 */
+    background: #4b5563 !important; /* bg-gray-600 */
 }
 
 
@@ -109,7 +121,8 @@
 }
 
 #wgram-overlay input,
-#wgram-login-overlay input {
+#wgram-login-overlay input,
+#wgram-overlay textarea {
   background-color: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #e0e0e0;
@@ -122,10 +135,11 @@
 }
 
 #wgram-overlay input:focus,
-#wgram-login-overlay input:focus {
+#wgram-login-overlay input:focus,
+#wgram-overlay textarea:focus {
     outline: none;
-    border-color: #4a8eff;
-    box-shadow: 0 0 0 2px rgba(74, 142, 255, 0.3);
+    border-color: var(--wgram-pink);
+    box-shadow: 0 0 0 2px rgba(214, 64, 139, 0.3);
 }
 
 /* Painel de Informações do Projeto com Animação */
@@ -188,7 +202,7 @@
 }
 
 #wgram-overlay button, #wgram-login-overlay button {
-  background: linear-gradient(to right, #4a8eff, #2e6cdf);
+  background: var(--wgram-gradient);
   color: white;
   border: none;
   padding: 10px 12px;
@@ -228,3 +242,90 @@
 #wgram-credits strong {
     color: #9ca3af;
 }
+
+/* --- Estilos do Painel "Meus Projetos" --- */
+#wgram-projects-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 500px;
+    background: rgba(18, 18, 22, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--wgram-text);
+    z-index: 10000;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+#wgram-projects-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#wgram-projects-header h2 {
+    background: var(--wgram-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+#wgram-projects-header button {
+    background: transparent !important;
+    border: none;
+    color: var(--wgram-text-muted);
+    font-size: 1.2rem;
+}
+#wgram-projects-header button:hover {
+    color: var(--wgram-text);
+    transform: none;
+    box-shadow: none;
+}
+
+
+#wgram-projects-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.wgram-project-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--wgram-surface);
+    transition: background-color 0.2s ease;
+    border-radius: 8px;
+}
+
+.wgram-project-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.wgram-project-item:last-child {
+    border-bottom: none;
+}
+
+.wgram-project-item-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.wgram-project-item-info small {
+    color: var(--wgram-text-muted);
+}
+
+/* Toggle Switch */
+.wgram-toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.wgram-toggle-switch input { opacity: 0; width: 0; height: 0; }
+.wgram-toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--wgram-surface); transition: .4s; border-radius: 22px; }
+.wgram-toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .wgram-toggle-slider { background: var(--wgram-gradient); }
+input:checked + .wgram-toggle-slider:before { transform: translateX(18px); }
