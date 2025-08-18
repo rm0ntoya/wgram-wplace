@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.5
+// @version      1.9.7
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.0
@@ -72,7 +72,6 @@
         this.name = name;
         this.version = version;
         this.authManager = null;
-        this.apiManager = null;
         this.templateManager = null;
         this.overlayBuilder = new Overlay();
         this.isMinimized = false;
@@ -95,17 +94,14 @@
         try {
             const el = document.querySelector(selector);
             if (el && el.textContent) {
-                console.log("[Wgram] Nome de usuário encontrado na página:", el.textContent.trim());
                 return el.textContent.trim();
             }
         } catch (error) {
             console.error("[Wgram] Erro ao tentar buscar o nome de usuário na página:", error);
         }
-        console.log("[Wgram] Elemento do nome de usuário não encontrado na página.");
         return null;
     }
 
-    // INÍCIO DA MODIFICAÇÃO: Nova função para buscar o dinheiro do usuário na página
     /**
      * Tenta encontrar o dinheiro do usuário do Wplace diretamente na página.
      * @returns {string|null} O valor encontrado ou null se não for encontrado.
@@ -115,16 +111,27 @@
         try {
             const el = document.querySelector(selector);
             if (el && el.textContent) {
-                console.log("[Wgram] Dinheiro encontrado na página:", el.textContent.trim());
                 return el.textContent.trim();
             }
         } catch (error) {
             console.error("[Wgram] Erro ao tentar buscar o dinheiro na página:", error);
         }
-        console.log("[Wgram] Elemento do dinheiro não encontrado na página.");
         return null;
     }
-    // FIM DA MODIFICAÇÃO
+    
+    /**
+     * Obtém as coordenadas atuais do pixel a partir do hash da URL.
+     * @returns {number[]|null} Um array com as coordenadas [tl_x, tl_y, px_x, px_y] ou null.
+     */
+    getCurrentCoordsFromURL() {
+        const hash = window.location.hash;
+        if (!hash.startsWith('#/')) return null;
+        const parts = hash.substring(2).split('/').map(Number);
+        if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+            return parts;
+        }
+        return null;
+    }
 
     buildMaintenanceOverlay(message) {
         this.destroyOverlay('wgram-overlay');
@@ -168,10 +175,8 @@
         }
         const finalUsername = wplaceUsername || 'Não definido';
 
-        // INÍCIO DA MODIFICAÇÃO: Lógica para obter e formatar o dinheiro
         const moneyAmount = this._getWplaceMoneyFromPage();
         const finalMoneyText = moneyAmount ? `Dinheiro: ${moneyAmount}` : 'Dinheiro: N/A';
-        // FIM DA MODIFICAÇÃO
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
@@ -186,10 +191,8 @@
                     .buildElement()
                     .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
                     .buildElement()
-                    // INÍCIO DA MODIFICAÇÃO: Adicionado elemento para exibir o dinheiro
                     .addSmall({ id: 'wgram-user-money', textContent: finalMoneyText, style: 'font-size: 0.9em; color: #6ee7b7; margin-top: 4px;' })
                     .buildElement()
-                    // FIM DA MODIFICAÇÃO
                 .buildElement()
                 .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
                 .buildElement()
@@ -350,7 +353,7 @@
             return;
         }
 
-        const initialCoords = this.apiManager.getCurrentCoords();
+        const initialCoords = this.getCurrentCoordsFromURL();
         if (initialCoords && initialCoords.length >= 4) {
             this.authManager.saveAndCopyCoordsId(initialCoords);
             return;
@@ -368,7 +371,7 @@
         const maxAttempts = 60; 
 
         this.coordCheckInterval = setInterval(() => {
-            const polledCoords = this.apiManager.getCurrentCoords();
+            const polledCoords = this.getCurrentCoordsFromURL();
             attempts++;
 
             if (polledCoords && polledCoords.length >= 4) {
@@ -561,32 +564,78 @@
         }
     }
 
-    async saveWplaceAccountData(accountData) {
+    /**
+     * Sincroniza os dados da conta Wplace (obtidos da página) com o Firebase.
+     */
+    async syncWplaceAccountFromPage() {
         const user = this.auth.currentUser;
-        if (!user) {
-            console.warn("[Wgram] Tentativa de salvar dados da conta sem usuário logado.");
-            return;
+        if (!user) return;
+
+        const username = this.uiManager._getWplaceUsernameFromPage();
+        if (!username) {
+            return; // Não salva se não conseguir obter um nome de usuário
         }
-        if (!accountData || !accountData.id) {
-            console.error("[Wgram] Dados da conta inválidos ou sem ID para salvar.", accountData);
-            return;
+        const money = this.uiManager._getWplaceMoneyFromPage();
+        const lpData = localStorage.getItem('lp');
+
+        const accountData = {
+            username: username,
+            money: money || 'N/A',
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (lpData) {
+            accountData.lp = lpData;
         }
 
         try {
-            const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(String(accountData.id));
-            
-            const dataToSave = {
-                ...accountData,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-            };
+            // Usa o nome de usuário como ID do documento para evitar duplicatas
+            const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(username);
+            await accountDocRef.set(accountData, { merge: true });
+            console.log(`[Wgram] Dados da conta Wplace "${username}" sincronizados via DOM.`);
+        } catch (error) {
+            this.uiManager.displayError("Falha ao sincronizar conta Wplace via DOM.");
+            console.error("[Wgram] Erro ao salvar dados da conta Wplace via DOM:", error);
+        }
+    }
 
-            await accountDocRef.set(dataToSave, { merge: true });
-            this.uiManager.displayStatus(`Conta Wplace "${accountData.username}" sincronizada.`);
-            console.log(`[Wgram] Dados da conta ${accountData.username} (ID: ${accountData.id}) salvos com sucesso.`);
+    /**
+     * Salva a chave 'lp' e outros dados da conta no Firebase e depois a remove do localStorage.
+     */
+    async backupAndClearLp() {
+        const user = this.auth.currentUser;
+        if (!user) return;
+
+        const lpData = localStorage.getItem('lp');
+        if (!lpData) return; // Se não há 'lp', não há nada a fazer.
+
+        const username = this.uiManager._getWplaceUsernameFromPage();
+        if (!username) {
+            console.warn("[Wgram] Não foi possível fazer backup da chave 'lp' pois o nome de usuário não foi encontrado na página.");
+            return;
+        }
+        
+        const money = this.uiManager._getWplaceMoneyFromPage();
+
+        const accountData = {
+            username: username,
+            money: money || 'N/A',
+            lp: lpData,
+            lastBackupAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        try {
+            const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(username);
+            await accountDocRef.set(accountData, { merge: true });
+            
+            // Somente remove a chave após o sucesso do backup
+            localStorage.removeItem('lp');
+            this.uiManager.displayStatus(`Backup da conta '${username}' realizado e 'lp' limpo.`);
 
         } catch (error) {
-            this.uiManager.displayError("Falha ao sincronizar conta Wplace.");
-            console.error("[Wgram] Erro ao salvar dados da conta Wplace:", error);
+            this.uiManager.displayError(`Falha ao fazer backup da conta '${username}'.`);
+            console.error("[Wgram] Erro ao fazer backup e limpar 'lp':", error);
         }
     }
   }
@@ -680,90 +729,6 @@
     setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
   }
 
-  // --- Módulo: src/core/ApiManager.js ---
-  class ApiManager {
-    constructor(templateManager, uiManager, authManager) { 
-        this.templateManager = templateManager; 
-        this.uiManager = uiManager; 
-        this.authManager = authManager;
-        this.disableAll = false; 
-        this.coordsTilePixel = []; 
-    }
-    initializeApiListener() { window.addEventListener('message', async (event) => { const { data } = event; if (!data || !data.isWgramMessage || data.source !== 'wgram-spy') { return; } const endpoint = this.#parseEndpoint(data.endpoint); if (endpoint === 'tiles') { await this.#handleTileResponse(data); return; } if (data.jsonData) { this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint); } }); }
-    #parseEndpoint(url) { if (!url) return ''; return url.split('?')[0].split('/').filter(s => s && isNaN(Number(s)) && !s.includes('.')).pop() || ''; }
-    
-    #handleJsonResponse(endpoint, jsonData, fullUrl) { 
-        switch (endpoint) { 
-            case 'pixel': 
-                this.#processPixelCoords(fullUrl); 
-                break;
-            case 'me':
-                this.#handleAccountInfo(jsonData);
-                break;
-        } 
-    }
-    
-    #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); }
-    getCurrentCoords() { return this.coordsTilePixel; }
-    
-    #handleAccountInfo(jsonData) {
-        if (this.authManager) {
-            this.authManager.saveWplaceAccountData(jsonData);
-        }
-    }
-
-    async #handleTileResponse(data) { 
-        let tileCoords = data.endpoint.split('/'); 
-        tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; 
-        const { blobID, blobData, blink } = data; 
-        const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords); 
-        window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*'); 
-    }
-  }
-
-  // --- Módulo: src/core/Injector.js ---
-  class Injector {
-    injectFetchSpy() {
-        const spyFunction = function() {
-            const SCRIPT_NAME = 'Wgram';
-            const SPY_SOURCE = 'wgram-spy';
-            const MAIN_SOURCE = 'wgram-main';
-            const originalFetch = window.fetch;
-            const fetchedBlobQueue = new Map();
-            window.addEventListener('message', (event) => {
-                const { data } = event;
-                if (!data || !data.isWgramMessage || data.source !== MAIN_SOURCE) { return; }
-                const resolveCallback = fetchedBlobQueue.get(data.blobID);
-                if (typeof resolveCallback === 'function') {
-                    resolveCallback(data.blobData);
-                    fetchedBlobQueue.delete(data.blobID);
-                }
-            });
-            window.fetch = async function(...args) {
-                const response = await originalFetch.apply(this, args);
-                const clonedResponse = response.clone();
-                const url = (args[0] instanceof Request) ? args[0].url : (args[0] || '');
-                const contentType = clonedResponse.headers.get('content-type') || '';
-                if (contentType.includes('application/json')) {
-                    clonedResponse.json().then(jsonData => { window.postMessage({ isWgramMessage: true, source: SPY_SOURCE, endpoint: url, jsonData: jsonData }, '*'); }).catch(err => { console.error(`[${SCRIPT_NAME}] Erro ao processar JSON:`, err); });
-                } else if (contentType.includes('image/') && !url.includes('openfreemap') && !url.includes('maps')) {
-                    const blob = await clonedResponse.blob();
-                    return new Promise((resolve) => {
-                        const blobUUID = crypto.randomUUID();
-                        fetchedBlobQueue.set(blobUUID, (processedBlob) => { resolve(new Response(processedBlob, { headers: clonedResponse.headers, status: clonedResponse.status, statusText: clonedResponse.statusText })); });
-                        window.postMessage({ isWgramMessage: true, source: SPY_SOURCE, endpoint: url, blobID: blobUUID, blobData: blob, blink: Date.now() }, '*');
-                    });
-                }
-                return response;
-            };
-        };
-        const script = document.createElement('script');
-        script.textContent = `(${spyFunction.toString()})();`;
-        document.documentElement.appendChild(script);
-        script.remove();
-    }
-  }
-
   // --- Módulo: src/main.js ---
   class WgramScript {
     constructor() { 
@@ -771,11 +736,8 @@
         this.uiManager = new UIManager(this.info.name, this.info.version); 
         this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); 
         this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); 
-        this.apiManager = new ApiManager(this.templateManager, this.uiManager, this.authManager); 
-        this.injector = new Injector(); 
         this.uiManager.authManager = this.authManager; 
         this.uiManager.templateManager = this.templateManager; 
-        this.uiManager.apiManager = this.apiManager; 
     }
     async start() {
         console.log(`[${this.info.name}] v${this.info.version} a iniciar...`);
@@ -796,15 +758,15 @@
                     this.uiManager.buildMainOverlay(user, userData || {});
                     
                     if (userSettings && userSettings.autoClearLp) {
-                        if (localStorage.getItem('lp')) {
-                            localStorage.removeItem('lp');
-                            this.uiManager.displayStatus("Chave 'lp' removida automaticamente.");
-                        }
+                        await this.authManager.backupAndClearLp();
                     }
 
                     this.templateManager.setUserId(user.uid);
-                    this.injector.injectFetchSpy();
-                    this.apiManager.initializeApiListener();
+                    
+                    // Sincroniza a conta do Wplace periodicamente usando os dados da página
+                    setInterval(() => {
+                        this.authManager.syncWplaceAccountFromPage();
+                    }, 15000); // Sincroniza a cada 15 segundos
 
                     const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
                     
