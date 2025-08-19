@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.4
+// @version      2.5
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.2
@@ -925,7 +925,7 @@ this.colorPalette[colorKey].count++;
                     } else if (userSettings.autoLoadLastProject && userData.lastLoadedProjectId) {
                         console.log(`[${this.info.name}] Auto-carregamento ativado. Carregando último projeto: ${userData.lastLoadedProjectId}`);
                         this.uiManager.displayStatus(`Auto-carregando último projeto...`);
-                        setTimeout(() => this.templateManager.loadItemFromFiresxtore(userData.lastLoadedProjectId), 100);
+                        setTimeout(() => this.templateManager.loadItemFromFirestore(userData.lastLoadedProjectId), 100);
                     }
 
                 } else {
