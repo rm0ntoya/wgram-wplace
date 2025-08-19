@@ -158,6 +158,13 @@ export default class UIManager {
             container.innerHTML = '<small>Nenhuma cor encontrada no template.</small>';
             return;
         }
+        
+        // Adiciona um cabeçalho para a secção de filtros
+        const header = document.createElement('p');
+        header.innerHTML = '<strong>Filtro de Cores:</strong>';
+        header.style.marginBottom = '8px';
+        header.style.marginTop = '0';
+        container.appendChild(header);
 
         sortedColors.forEach(([colorKey, colorData]) => {
             const [r, g, b] = colorKey.split(',');
@@ -197,19 +204,18 @@ export default class UIManager {
     /**
      * Exibe a UI relacionada a um template carregado (infos, filtros de cor, etc.).
      * Este método deve ser chamado pelo TemplateManager após o template ser processado.
-     * @param {Template} template
+     * @param {object} project - O objeto do projeto com informações a serem exibidas.
+     * @param {Template} template - O objeto do template processado.
      */
-    displayTemplateUI(template) {
-        if (!template) {
-            const filterContainer = document.getElementById('wgram-color-filter-container');
-            if (filterContainer) filterContainer.style.display = 'none';
-            // Adicione aqui a lógica para esconder outras informações do template, se necessário
-            return;
+    displayProjectInfo(project, template) {
+        // Esta parte é um exemplo, você pode precisar de um contêiner para as informações do projeto
+        const infoContainer = document.getElementById('wgram-project-info'); // Crie este div se não existir
+        if (infoContainer) {
+            infoContainer.style.display = 'block';
+            this.updateElement('wgram-info-name', `<strong>Nome:</strong> ${project.name}`);
+            // Adicione mais informações se desejar
         }
         
-        // Adicione aqui a lógica para mostrar o nome, autor, etc., do template na UI
-        // this.updateElement('wgram-info-name', template.displayName);
-
         // Constrói e exibe a lista de filtros de cor para o template carregado
         this.buildColorFilterList(template);
     }

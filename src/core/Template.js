@@ -12,10 +12,8 @@ export default class Template {
         this.width = 0;
         this.height = 0;
         this.chunks = chunks;
-        // --- ALTERAÇÃO INÍCIO ---
         // Adiciona um objeto para armazenar a paleta de cores, contagem de píxeis e estado de ativação.
         this.colorPalette = {};
-        // --- ALTERAÇÃO FIM ---
     }
 
     /**
@@ -72,7 +70,6 @@ export default class Template {
                 // Se o píxel for transparente, ignora-o
                 if (pixelData[3] === 0) continue;
 
-                // --- ALTERAÇÃO INÍCIO ---
                 // Lógica para analisar e catalogar cada cor encontrada na imagem.
                 const colorKey = `${pixelData[0]},${pixelData[1]},${pixelData[2]}`;
                 if (!this.colorPalette[colorKey]) {
@@ -80,7 +77,6 @@ export default class Template {
                     this.colorPalette[colorKey] = { count: 0, enabled: true };
                 }
                 this.colorPalette[colorKey].count++;
-                // --- ALTERAÇÃO FIM ---
 
                 // Desenha um quadrado de 1x1 no centro de uma grelha de 3x3 para criar o efeito de malha
                 this.chunks[tileKey].ctx.fillStyle = `rgba(${pixelData[0]}, ${pixelData[1]}, ${pixelData[2]}, ${pixelData[3] / 255})`;
