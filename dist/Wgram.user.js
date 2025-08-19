@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.5
+// @version      2.6
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.2
