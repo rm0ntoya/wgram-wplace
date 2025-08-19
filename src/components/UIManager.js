@@ -119,12 +119,101 @@ export default class UIManager {
                     .addButton({ id: 'wgram-btn-load', textContent: 'Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
                     .buildElement()
                 .buildElement()
+                // --- ALTERAÇÃO INÍCIO ---
+                // Adiciona um contêiner para a lista de filtros de cor, que começa escondido.
+                .addDiv({
+                    id: 'wgram-color-filter-container',
+                    style: 'display: none; max-height: 140px; overflow-y: auto; margin-top: 10px; border: 1px solid #555; border-radius: 5px; padding: 8px;'
+                })
+                .buildElement()
+                // --- ALTERAÇÃO FIM ---
             .buildElement()
             .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
         .buildElement()
         .buildOverlay(document.body);
         this.handleDrag('wgram-overlay', 'wgram-drag-handle');
     }
+
+    // --- ALTERAÇÃO INÍCIO ---
+    // Este é o novo método que cria a lista de filtros de cor na UI.
+    /**
+     * Constrói e exibe a lista de filtros de cor para um determinado template.
+     * @param {Template} template - O template ativo que contém a colorPalette.
+     */
+    buildColorFilterList(template) {
+        const container = document.getElementById('wgram-color-filter-container');
+        if (!container || !template || !template.colorPalette) {
+            if (container) container.style.display = 'none';
+            return;
+        }
+
+        container.innerHTML = ''; // Limpa a lista anterior
+        container.style.display = 'block';
+
+        // Ordena as cores pela quantidade de píxeis (da mais comum para a menos comum)
+        const sortedColors = Object.entries(template.colorPalette)
+            .sort(([, a], [, b]) => b.count - a.count);
+
+        if (sortedColors.length === 0) {
+            container.innerHTML = '<small>Nenhuma cor encontrada no template.</small>';
+            return;
+        }
+
+        sortedColors.forEach(([colorKey, colorData]) => {
+            const [r, g, b] = colorKey.split(',');
+
+            const wrapper = document.createElement('div');
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.marginBottom = '5px';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = colorData.enabled;
+            checkbox.style.marginRight = '8px';
+            checkbox.onchange = () => {
+                colorData.enabled = checkbox.checked;
+                this.displayStatus(`Filtro de cor atualizado. Mova o mapa para ver a alteração.`);
+            };
+
+            const colorSwatch = document.createElement('div');
+            colorSwatch.style.width = '16px';
+            colorSwatch.style.height = '16px';
+            colorSwatch.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+            colorSwatch.style.border = '1px solid #888';
+            colorSwatch.style.marginRight = '8px';
+
+            const label = document.createElement('span');
+            label.textContent = `${colorData.count.toLocaleString('pt-BR')} píxeis`;
+            label.style.fontSize = '0.9em';
+
+            wrapper.appendChild(checkbox);
+            wrapper.appendChild(colorSwatch);
+            wrapper.appendChild(label);
+            container.appendChild(wrapper);
+        });
+    }
+
+    /**
+     * Exibe a UI relacionada a um template carregado (infos, filtros de cor, etc.).
+     * Este método deve ser chamado pelo TemplateManager após o template ser processado.
+     * @param {Template} template
+     */
+    displayTemplateUI(template) {
+        if (!template) {
+            const filterContainer = document.getElementById('wgram-color-filter-container');
+            if (filterContainer) filterContainer.style.display = 'none';
+            // Adicione aqui a lógica para esconder outras informações do template, se necessário
+            return;
+        }
+        
+        // Adicione aqui a lógica para mostrar o nome, autor, etc., do template na UI
+        // this.updateElement('wgram-info-name', template.displayName);
+
+        // Constrói e exibe a lista de filtros de cor para o template carregado
+        this.buildColorFilterList(template);
+    }
+    // --- ALTERAÇÃO FIM ---
 
     #handleLoadProject() {
         const projectId = document.getElementById('wgram-project-id').value.trim();
