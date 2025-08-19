@@ -4,7 +4,7 @@
 // @version      2
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live com login e salvamento na nuvem.
 // @author       rm0ntoya
-// @license      MPL-2.2
+// @license      MPL-2.3
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
 // @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png

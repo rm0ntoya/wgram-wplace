@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.2
-// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas.
+// @version      2.3
+// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
-// @license      MPL-2.2
+// @license      MPL-2.3
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
 // @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png
@@ -62,7 +62,7 @@
   // --- Módulo: src/core/Template.js ---
   class Template {
     constructor({ displayName = 'Template Carregado', authorId = '', coords = [0,0,0,0], chunks = {} }) { this.id = crypto.randomUUID(); this.displayName = displayName; this.authorId = authorId; this.coords = coords; this.pixelCount = 0; this.width = 0; this.height = 0; this.chunks = chunks; this.colorPalette = {}; }
-    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = this.width * this.height; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue; 
+    async processImage(dataSource) { const TILE_SIZE = 1000; const RENDER_SCALE = 3; let imageSource = dataSource; if (typeof dataSource === 'string') { const img = new Image(); img.src = dataSource; await new Promise(resolve => img.onload = resolve); imageSource = img; } const mainBitmap = await createImageBitmap(imageSource); this.width = mainBitmap.width; this.height = mainBitmap.height; this.pixelCount = this.width * this.height; const [startTileX, startTileY, startPixelX, startPixelY] = this.coords; const tempCanvas = new OffscreenCanvas(1, 1); const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); for (let y = 0; y < this.height; y++) { for (let x = 0; x < this.width; x++) { const currentGlobalPixelX = startPixelX + x; const currentGlobalPixelY = startPixelY + y; const tileX = startTileX + Math.floor(currentGlobalPixelX / TILE_SIZE); const tileY = startTileY + Math.floor(currentGlobalPixelY / TILE_SIZE); const pixelXInTile = currentGlobalPixelX % TILE_SIZE; const pixelYInTile = currentGlobalPixelY % TILE_SIZE; const tileKey = `${tileX},${tileY}`; if (!this.chunks[tileKey]) { const canvas = new OffscreenCanvas(TILE_SIZE * RENDER_SCALE, TILE_SIZE * RENDER_SCALE); this.chunks[tileKey] = { canvas: canvas, ctx: canvas.getContext('2d') }; this.chunks[tileKey].ctx.imageSmoothingEnabled = false; } tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1); const pixelData = tempCtx.getImageData(0, 0, 1, 1).data; if (pixelData[3] === 0) continue;
     const colorKey = `${pixelData[0]},${pixelData[1]},${pixelData[2]}`;
 if (!this.colorPalette[colorKey]) {
     this.colorPalette[colorKey] = { count: 0, enabled: true };
@@ -92,10 +92,6 @@ this.colorPalette[colorKey].count++;
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
     
-    /**
-     * Tenta encontrar o nome de usuário do Wplace diretamente na página.
-     * @returns {string|null} O nome de usuário encontrado ou null se não for encontrado.
-     */
     _getWplaceUsernameFromPage() {
         const selector = "body > div:nth-child(1) > div.disable-pinch-zoom.relative.h-full.overflow-hidden.svelte-6wmtgk > div.absolute.right-2.top-2.z-30 > div > div:nth-child(1) > div > div.dropdown-content.menu.bg-base-100.rounded-box.border-base-300.z-1.relative.right-1.w-\\[min\\(100vw-24px\\,400px\\)\\].translate-y-2.border.p-4.shadow-md > section:nth-child(2) > div:nth-child(2) > div.flex.items-center.gap-1\\.5.pr-8.text-lg.font-medium > h3";
         try {
@@ -111,11 +107,6 @@ this.colorPalette[colorKey].count++;
         return null;
     }
 
-    // INÍCIO DA MODIFICAÇÃO: Nova função para buscar o dinheiro do usuário na página
-    /**
-     * Tenta encontrar o dinheiro do usuário do Wplace diretamente na página.
-     * @returns {string|null} O valor encontrado ou null se não for encontrado.
-     */
     _getWplaceMoneyFromPage() {
         const selector = "body > div:nth-child(1) > dialog:nth-child(4) > div > div > section > div > div > button > span > span.text-primary.text-base.font-semibold";
         try {
@@ -130,7 +121,6 @@ this.colorPalette[colorKey].count++;
         console.log("[Wgram] Elemento do dinheiro não encontrado na página.");
         return null;
     }
-    // FIM DA MODIFICAÇÃO
 
     buildMaintenanceOverlay(message) {
         this.destroyOverlay('wgram-overlay');
@@ -174,10 +164,8 @@ this.colorPalette[colorKey].count++;
         }
         const finalUsername = wplaceUsername || 'Não definido';
 
-        // INÍCIO DA MODIFICAÇÃO: Lógica para obter e formatar o dinheiro
         const moneyAmount = this._getWplaceMoneyFromPage();
         const finalMoneyText = moneyAmount ? `Dinheiro: ${moneyAmount}` : 'Dinheiro: N/A';
-        // FIM DA MODIFICAÇÃO
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })
@@ -192,10 +180,8 @@ this.colorPalette[colorKey].count++;
                     .buildElement()
                     .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
                     .buildElement()
-                    // INÍCIO DA MODIFICAÇÃO: Adicionado elemento para exibir o dinheiro
                     .addSmall({ id: 'wgram-user-money', textContent: finalMoneyText, style: 'font-size: 0.9em; color: #6ee7b7; margin-top: 4px;' })
                     .buildElement()
-                    // FIM DA MODIFICAÇÃO
                 .buildElement()
                 .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
                 .buildElement()
@@ -208,7 +194,6 @@ this.colorPalette[colorKey].count++;
                     .addP({ id: 'wgram-info-creator' }).buildElement()
                     .addP({ id: 'wgram-info-pixels' }).buildElement()
                     .addP({ id: 'wgram-info-coords' }).buildElement()
-                    .addDiv({ id: 'wgram-color-filter-container', style: 'display: none; max-height: 140px; overflow-y: auto; margin-top: 10px; border: 1px solid #4b5563; border-radius: 5px; padding: 8px;' }).buildElement()
                 .buildElement()
                 .addDiv({ id: 'wgram-coords-container', style: 'display: none;' })
                     .addInput({ type: 'number', id: 'wgram-input-tx', placeholder: 'Tl X' }).buildElement()
@@ -296,6 +281,81 @@ this.colorPalette[colorKey].count++;
     
         builder.buildElement().buildOverlay(document.body);
     }
+
+    // --- INÍCIO DA MODIFICAÇÃO: NOVO MÉTODO PARA O POP-UP DE FILTRO DE CORES ---
+    buildColorFilterOverlay(template) {
+        this.destroyOverlay('wgram-color-filter-overlay'); // Garante que não há overlays duplicados
+        const builder = new Overlay();
+    
+        builder.addDiv({ id: 'wgram-color-filter-overlay' }) // ID e estilo consistentes com o de projetos
+            .addDiv({ id: 'wgram-color-filter-header' })
+                .addHeader(2, { textContent: 'Filtro de Cores' }).buildElement()
+                .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-color-filter-overlay'))
+                .buildElement()
+            .buildElement()
+            .addDiv({ id: 'wgram-color-filter-list' }); // Container para a lista de cores
+    
+        if (!template || !template.colorPalette) {
+            builder.addP({ textContent: 'Nenhuma paleta de cores encontrada para este template.' }).buildElement();
+        } else {
+            const sortedColors = Object.entries(template.colorPalette).sort(([, a], [, b]) => b.count - a.count);
+            if (sortedColors.length === 0) {
+                builder.addP({ textContent: 'Nenhuma cor encontrada no template.' }).buildElement();
+            } else {
+                // Adiciona botões "Marcar Todos" / "Desmarcar Todos"
+                builder.addDiv({ className: 'wgram-filter-actions' })
+                    .addButton({ textContent: 'Marcar Todos' }, (_, btn) => {
+                        btn.onclick = () => {
+                            document.querySelectorAll('#wgram-color-filter-list input[type="checkbox"]').forEach(cb => {
+                                if (!cb.checked) cb.click();
+                            });
+                        };
+                    })
+                    .buildElement()
+                    .addButton({ textContent: 'Desmarcar Todos' }, (_, btn) => {
+                        btn.onclick = () => {
+                            document.querySelectorAll('#wgram-color-filter-list input[type="checkbox"]').forEach(cb => {
+                                if (cb.checked) cb.click();
+                            });
+                        };
+                    })
+                    .buildElement()
+                .buildElement();
+
+                sortedColors.forEach(([colorKey, colorData]) => {
+                    const [r, g, b] = colorKey.split(',');
+                    // Cada item da lista é um container flexível
+                    builder.addDiv({ className: 'wgram-color-filter-item' })
+                        // Amostra da cor
+                        .addDiv({ style: `width: 20px; height: 20px; background-color: rgb(${r}, ${g}, ${b}); border: 1px solid #888; margin-right: 10px; flex-shrink: 0;` })
+                        .buildElement()
+                        // Rótulo com a contagem de pixels
+                        .addLabel({ textContent: `${colorData.count.toLocaleString('pt-BR')} pixels`, className: 'wgram-color-filter-label' })
+                        .buildElement()
+                        // Interruptor (toggle switch) para ativar/desativar
+                        .addLabel({ className: 'wgram-toggle-switch' })
+                            .addInput({
+                                type: 'checkbox',
+                                checked: colorData.enabled
+                            }, (_, input) => {
+                                input.onchange = () => {
+                                    colorData.enabled = input.checked;
+                                    this.displayStatus(`Filtro atualizado. Mova o mapa para ver a alteração.`);
+                                };
+                            })
+                            .buildElement()
+                            .addDiv({ className: 'wgram-toggle-slider' })
+                            .buildElement()
+                        .buildElement()
+                    .buildElement();
+                });
+            }
+        }
+    
+        builder.buildElement().buildOverlay(document.body);
+    }
+    // --- FIM DA MODIFICAÇÃO ---
+
     #setupSettingsListeners() {
         const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
         const autoLoadToggle = document.getElementById('wgram-toggle-auto-load');
@@ -396,56 +456,54 @@ this.colorPalette[colorKey].count++;
         }, 500);
     }
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
-// Dentro da class UIManager
-
-// --- SUBSTITUA O SEU MÉTODO displayProjectInfo POR ESTE ---
-displayProjectInfo(project, template) {
-    const infoContainer = document.getElementById('wgram-project-info');
-    if (infoContainer) {
-        infoContainer.style.display = 'block';
-        this.updateElement('wgram-info-name', `<i class="fa-solid fa-file-signature fa-fw"></i> <strong>Nome:</strong> <span>${project.name}</span>`);
-        this.updateElement('wgram-info-creator', `<i class="fa-solid fa-user fa-fw"></i> <strong>Criador:</strong> <span>${project.owner}</span>`);
-        this.updateElement('wgram-info-pixels', `<i class="fa-solid fa-th fa-fw"></i> <strong>Píxeis:</strong> <span>${project.pixels.toLocaleString('pt-BR')}</span>`);
-        if (project.coords) {
-            this.updateElement('wgram-info-coords', `<i class="fa-solid fa-map-marker-alt fa-fw"></i> <strong>Coords:</strong> <span>${project.coords.join(', ')}</span>`);
+    
+    // --- INÍCIO DA MODIFICAÇÃO: MÉTODO displayProjectInfo ATUALIZADO ---
+    displayProjectInfo(project, template) {
+        const infoContainer = document.getElementById('wgram-project-info');
+        if (infoContainer) {
+            infoContainer.style.display = 'block';
+            this.updateElement('wgram-info-name', `<i class="fa-solid fa-file-signature fa-fw"></i> <strong>Nome:</strong> <span>${project.name}</span>`);
+            this.updateElement('wgram-info-creator', `<i class="fa-solid fa-user fa-fw"></i> <strong>Criador:</strong> <span>${project.owner}</span>`);
+            this.updateElement('wgram-info-pixels', `<i class="fa-solid fa-th fa-fw"></i> <strong>Píxeis:</strong> <span>${project.pixels.toLocaleString('pt-BR')}</span>`);
+            if (project.coords) {
+                this.updateElement('wgram-info-coords', `<i class="fa-solid fa-map-marker-alt fa-fw"></i> <strong>Coords:</strong> <span>${project.coords.join(', ')}</span>`);
+            }
+            infoContainer.classList.add('visible');
         }
-        infoContainer.classList.add('visible');
-    }
-    this.buildColorFilterList(template);
-}
-// --- FIM DA SUBSTITUIÇÃO ---
 
-// --- ADICIONE ESTE NOVO MÉTODO COMPLETO ---
-buildColorFilterList(template) {
-    const container = document.getElementById('wgram-color-filter-container');
-    if (!container || !template || !template.colorPalette) { if (container) container.style.display = 'none'; return; }
-    container.innerHTML = '';
-    container.style.display = 'block';
-    const sortedColors = Object.entries(template.colorPalette).sort(([, a], [, b]) => b.count - a.count);
-    if (sortedColors.length === 0) { container.innerHTML = '<small>Nenhuma cor encontrada no template.</small>'; return; }
-    const header = document.createElement('p');
-    header.innerHTML = '<strong>Filtro de Cores:</strong>';
-    header.style.marginBottom = '8px';
-    container.appendChild(header);
-    sortedColors.forEach(([colorKey, colorData]) => {
-        const [r, g, b] = colorKey.split(',');
-        const wrapper = document.createElement('div');
-        wrapper.style.display = 'flex'; wrapper.style.alignItems = 'center'; wrapper.style.marginBottom = '5px';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox'; checkbox.checked = colorData.enabled; checkbox.style.marginRight = '8px';
-        checkbox.onchange = () => { colorData.enabled = checkbox.checked; this.displayStatus(`Filtro de cor atualizado. Mova o mapa para ver a alteração.`); };
-        const colorSwatch = document.createElement('div');
-        colorSwatch.style.width = '16px'; colorSwatch.style.height = '16px'; colorSwatch.style.backgroundColor = `rgb(${r}, ${g}, ${b})`; colorSwatch.style.border = '1px solid #888'; colorSwatch.style.marginRight = '8px';
-        const label = document.createElement('span');
-        label.textContent = `${colorData.count.toLocaleString('pt-BR')} píxeis`; label.style.fontSize = '0.9em';
-        wrapper.appendChild(checkbox); wrapper.appendChild(colorSwatch); wrapper.appendChild(label);
-        container.appendChild(wrapper);
-    });
-}
-// --- FIM DO NOVO MÉTODO ---
+        // Lógica para criar e adicionar o botão de filtro de cores
+        const buttonsContainer = document.getElementById('wgram-template-buttons');
+        let filterBtn = document.getElementById('wgram-btn-color-filter');
+
+        // Remove o botão antigo se existir, para evitar duplicatas ao carregar um novo projeto
+        if (filterBtn) {
+            filterBtn.remove();
+        }
+
+        // Cria o novo botão
+        filterBtn = document.createElement('button');
+        filterBtn.id = 'wgram-btn-color-filter';
+        filterBtn.innerHTML = '<i class="fas fa-palette"></i> Filtro de Cores';
+        filterBtn.onclick = () => this.buildColorFilterOverlay(template);
+
+        // Adiciona o botão ao container de botões
+        if (buttonsContainer) {
+            buttonsContainer.appendChild(filterBtn);
+        }
+    }
+    // --- FIM DA MODIFICAÇÃO ---
+
     hideInfoAndCoords() {
         const infoContainer = document.getElementById('wgram-project-info');
         if (infoContainer) infoContainer.classList.remove('visible');
+
+        // --- INÍCIO DA MODIFICAÇÃO: REMOVER BOTÃO DE FILTRO AO LIMPAR ---
+        const filterBtn = document.getElementById('wgram-btn-color-filter');
+        if (filterBtn) {
+            filterBtn.remove();
+        }
+        // --- FIM DA MODIFICAÇÃO ---
+
         this.toggleCoordsFields(false);
     }
     #toggleMinimize() { this.isMinimized = !this.isMinimized; const overlayElement = document.getElementById('wgram-overlay'); if (overlayElement) { overlayElement.classList.toggle('minimized', this.isMinimized); } this.displayStatus(this.isMinimized ? "Overlay minimizado." : "Overlay restaurado."); }
@@ -692,7 +750,7 @@ buildColorFilterList(template) {
             this.uiManager.toggleCoordsFields(false);
             const template = await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
             if (template) {
-        this.uiManager.displayProjectInfo({ name: name, owner: ownerName || 'Você', pixels: calculations.totalPixels, coords: coordsArray }, template);
+                this.uiManager.displayProjectInfo({ name: name, owner: ownerName || 'Você', pixels: calculations.totalPixels, coords: coordsArray }, template);
             }
         } else {
             this.uiManager.displayError("Projeto não tem coordenadas. Por favor, insira-as.");
@@ -717,36 +775,33 @@ buildColorFilterList(template) {
         this.uiManager.displayStatus(`A navegar para as coordenadas partilhadas por ${data.creatorWplaceUser}.`);
     }
     async createTemplateFromBase64(base64, name, coords) { this.uiManager.displayStatus(`A processar o template "${name}"...`); try { const template = new Template({ displayName: name, coords: coords }); await template.processImage(base64); this.templates = [template]; this.uiManager.displayStatus(`Template "${name}" carregado com sucesso!`); this.setTemplatesShouldBeDrawn(true); return template; } catch (error) { this.uiManager.displayError(`Falha ao processar o template: ${error.message}`); console.error(error); return null; } }
-// Dentro da class TemplateManager
 
-// --- SUBSTITUA O SEU MÉTODO drawTemplateOnTile POR ESTE ---
-async drawTemplateOnTile(tileBlob, tileCoords) {
-    if (!this.templatesShouldBeDrawn || this.templates.length === 0) { return tileBlob; }
-    const RENDER_SCALE = 3; const tileBitmap = await createImageBitmap(tileBlob); const scaledWidth = tileBitmap.width * RENDER_SCALE; const scaledHeight = tileBitmap.height * RENDER_SCALE; const canvas = new OffscreenCanvas(scaledWidth, scaledHeight); const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight);
-    for (const template of this.templates) {
-        const chunk = template.getChunkForTile(tileCoords);
-        if (chunk) {
-            const isAnyColorDisabled = Object.values(template.colorPalette).some(c => !c.enabled);
-            if (!isAnyColorDisabled) {
-                ctx.drawImage(chunk.bitmap, 0, 0);
-            } else {
-                const tempChunkCanvas = new OffscreenCanvas(chunk.bitmap.width, chunk.bitmap.height); const tempChunkCtx = tempChunkCanvas.getContext('2d', { willReadFrequently: true });
-                tempChunkCtx.drawImage(chunk.bitmap, 0, 0);
-                const imageData = tempChunkCtx.getImageData(0, 0, tempChunkCanvas.width, tempChunkCanvas.height); const data = imageData.data;
-                for (let i = 0; i < data.length; i += 4) {
-                    if (data[i + 3] > 0) {
-                        const colorKey = `${data[i]},${data[i + 1]},${data[i + 2]}`; const colorInfo = template.colorPalette[colorKey];
-                        if (!colorInfo || !colorInfo.enabled) { data[i + 3] = 0; }
+    async drawTemplateOnTile(tileBlob, tileCoords) {
+        if (!this.templatesShouldBeDrawn || this.templates.length === 0) { return tileBlob; }
+        const RENDER_SCALE = 3; const tileBitmap = await createImageBitmap(tileBlob); const scaledWidth = tileBitmap.width * RENDER_SCALE; const scaledHeight = tileBitmap.height * RENDER_SCALE; const canvas = new OffscreenCanvas(scaledWidth, scaledHeight); const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(tileBitmap, 0, 0, scaledWidth, scaledHeight);
+        for (const template of this.templates) {
+            const chunk = template.getChunkForTile(tileCoords);
+            if (chunk) {
+                const isAnyColorDisabled = Object.values(template.colorPalette).some(c => !c.enabled);
+                if (!isAnyColorDisabled) {
+                    ctx.drawImage(chunk.bitmap, 0, 0);
+                } else {
+                    const tempChunkCanvas = new OffscreenCanvas(chunk.bitmap.width, chunk.bitmap.height); const tempChunkCtx = tempChunkCanvas.getContext('2d', { willReadFrequently: true });
+                    tempChunkCtx.drawImage(chunk.bitmap, 0, 0);
+                    const imageData = tempChunkCtx.getImageData(0, 0, tempChunkCanvas.width, tempChunkCanvas.height); const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        if (data[i + 3] > 0) {
+                            const colorKey = `${data[i]},${data[i + 1]},${data[i + 2]}`; const colorInfo = template.colorPalette[colorKey];
+                            if (!colorInfo || !colorInfo.enabled) { data[i + 3] = 0; }
+                        }
                     }
+                    tempChunkCtx.putImageData(imageData, 0, 0);
+                    ctx.drawImage(tempChunkCanvas, 0, 0);
                 }
-                tempChunkCtx.putImageData(imageData, 0, 0);
-                ctx.drawImage(tempChunkCanvas, 0, 0);
             }
         }
+        return await canvas.convertToBlob({ type: 'image/png' });
     }
-    return await canvas.convertToBlob({ type: 'image/png' });
-}
-// --- FIM DA SUBSTITUIÇÃO ---
     setTemplatesShouldBeDrawn(shouldDraw) { this.templatesShouldBeDrawn = shouldDraw; this.uiManager.displayStatus(`Templates ${shouldDraw ? 'ativados' : 'desativados'}.`); }
   }
 
