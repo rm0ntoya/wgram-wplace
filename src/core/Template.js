@@ -63,6 +63,8 @@ export default class Template {
                     this.chunks[tileKey].ctx.imageSmoothingEnabled = false;
                 }
 
+                tempCtx.clearRect(0, 0, 1, 1); 
+
                 // Lê a cor do píxel atual da imagem de origem
                 tempCtx.drawImage(mainBitmap, x, y, 1, 1, 0, 0, 1, 1);
                 const pixelData = tempCtx.getImageData(0, 0, 1, 1).data;
