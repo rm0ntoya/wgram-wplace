@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.3
+// @version      2.5
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
-// @license      MPL-2.3
+// @license      MPL-2.2
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
 // @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png
@@ -282,18 +282,17 @@ this.colorPalette[colorKey].count++;
         builder.buildElement().buildOverlay(document.body);
     }
 
-    // --- INÍCIO DA MODIFICAÇÃO: NOVO MÉTODO PARA O POP-UP DE FILTRO DE CORES ---
     buildColorFilterOverlay(template) {
-        this.destroyOverlay('wgram-color-filter-overlay'); // Garante que não há overlays duplicados
+        this.destroyOverlay('wgram-color-filter-overlay'); 
         const builder = new Overlay();
     
-        builder.addDiv({ id: 'wgram-color-filter-overlay' }) // ID e estilo consistentes com o de projetos
+        builder.addDiv({ id: 'wgram-color-filter-overlay' }) 
             .addDiv({ id: 'wgram-color-filter-header' })
                 .addHeader(2, { textContent: 'Filtro de Cores' }).buildElement()
                 .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-color-filter-overlay'))
                 .buildElement()
             .buildElement()
-            .addDiv({ id: 'wgram-color-filter-list' }); // Container para a lista de cores
+            .addDiv({ id: 'wgram-color-filter-list' }); 
     
         if (!template || !template.colorPalette) {
             builder.addP({ textContent: 'Nenhuma paleta de cores encontrada para este template.' }).buildElement();
@@ -302,7 +301,6 @@ this.colorPalette[colorKey].count++;
             if (sortedColors.length === 0) {
                 builder.addP({ textContent: 'Nenhuma cor encontrada no template.' }).buildElement();
             } else {
-                // Adiciona botões "Marcar Todos" / "Desmarcar Todos"
                 builder.addDiv({ className: 'wgram-filter-actions' })
                     .addButton({ textContent: 'Marcar Todos' }, (_, btn) => {
                         btn.onclick = () => {
@@ -324,15 +322,11 @@ this.colorPalette[colorKey].count++;
 
                 sortedColors.forEach(([colorKey, colorData]) => {
                     const [r, g, b] = colorKey.split(',');
-                    // Cada item da lista é um container flexível
                     builder.addDiv({ className: 'wgram-color-filter-item' })
-                        // Amostra da cor
                         .addDiv({ style: `width: 20px; height: 20px; background-color: rgb(${r}, ${g}, ${b}); border: 1px solid #888; margin-right: 10px; flex-shrink: 0;` })
                         .buildElement()
-                        // Rótulo com a contagem de pixels
                         .addLabel({ textContent: `${colorData.count.toLocaleString('pt-BR')} pixels`, className: 'wgram-color-filter-label' })
                         .buildElement()
-                        // Interruptor (toggle switch) para ativar/desativar
                         .addLabel({ className: 'wgram-toggle-switch' })
                             .addInput({
                                 type: 'checkbox',
@@ -354,7 +348,6 @@ this.colorPalette[colorKey].count++;
     
         builder.buildElement().buildOverlay(document.body);
     }
-    // --- FIM DA MODIFICAÇÃO ---
 
     #setupSettingsListeners() {
         const clearLpToggle = document.getElementById('wgram-toggle-clear-lp');
@@ -457,7 +450,6 @@ this.colorPalette[colorKey].count++;
     }
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
     
-    // --- INÍCIO DA MODIFICAÇÃO: MÉTODO displayProjectInfo ATUALIZADO ---
     displayProjectInfo(project, template) {
         const infoContainer = document.getElementById('wgram-project-info');
         if (infoContainer) {
@@ -471,38 +463,31 @@ this.colorPalette[colorKey].count++;
             infoContainer.classList.add('visible');
         }
 
-        // Lógica para criar e adicionar o botão de filtro de cores
         const buttonsContainer = document.getElementById('wgram-template-buttons');
         let filterBtn = document.getElementById('wgram-btn-color-filter');
 
-        // Remove o botão antigo se existir, para evitar duplicatas ao carregar um novo projeto
         if (filterBtn) {
             filterBtn.remove();
         }
 
-        // Cria o novo botão
         filterBtn = document.createElement('button');
         filterBtn.id = 'wgram-btn-color-filter';
         filterBtn.innerHTML = '<i class="fas fa-palette"></i> Filtro de Cores';
         filterBtn.onclick = () => this.buildColorFilterOverlay(template);
 
-        // Adiciona o botão ao container de botões
         if (buttonsContainer) {
             buttonsContainer.appendChild(filterBtn);
         }
     }
-    // --- FIM DA MODIFICAÇÃO ---
 
     hideInfoAndCoords() {
         const infoContainer = document.getElementById('wgram-project-info');
         if (infoContainer) infoContainer.classList.remove('visible');
 
-        // --- INÍCIO DA MODIFICAÇÃO: REMOVER BOTÃO DE FILTRO AO LIMPAR ---
         const filterBtn = document.getElementById('wgram-btn-color-filter');
         if (filterBtn) {
             filterBtn.remove();
         }
-        // --- FIM DA MODIFICAÇÃO ---
 
         this.toggleCoordsFields(false);
     }
