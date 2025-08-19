@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.9
+// @version      3.0
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.2
@@ -89,7 +89,44 @@ this.colorPalette[colorKey].count++;
     updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
     displayStatus(text) { console.info(`[${this.name}] Status: ${text}`); this.updateElement(this.outputStatusId, `Status: ${text}`, true); }
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
-    handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
+handleDrag(moveElementId, handleId) {
+    const moveMe = document.getElementById(moveElementId);
+    const iMoveThings = document.getElementById(handleId);
+    if (!moveMe || !iMoveThings) {
+        this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`);
+        return;
+    }
+    let isDragging = false, offsetX = 0, offsetY = 0;
+    // Modificamos startDrag para receber o evento 'e'
+    const startDrag = (e) => {
+        // Se o clique foi exatamente no ícone, não inicie o arraste!
+        // Isso permite que o clique para minimizar funcione.
+        if (e.target.id === 'wgram-logo-handle') {
+            return;
+        }
+
+        isDragging = true;
+        const rect = moveMe.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        iMoveThings.classList.add('dragging');
+        document.body.style.userSelect = 'none';
+    };
+    const doDrag = (clientX, clientY) => {
+        if (!isDragging) return;
+        moveMe.style.left = `${clientX - offsetX}px`;
+        moveMe.style.top = `${clientY - offsetY}px`;
+    };
+    const endDrag = () => {
+        isDragging = false;
+        iMoveThings.classList.remove('dragging');
+        document.body.style.userSelect = '';
+    };
+    // Passamos o evento 'e' completo para a função startDrag
+    iMoveThings.addEventListener('mousedown', (e) => startDrag(e));
+    document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY));
+    document.addEventListener('mouseup', endDrag);
+}
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
     
     _getWplaceUsernameFromPage() {
@@ -244,7 +281,7 @@ this.colorPalette[colorKey].count++;
         .buildElement()
         .buildOverlay(document.body);
 
-        this.handleDrag('wgram-overlay', 'wgram-logo-handle');
+this.handleDrag('wgram-overlay', 'wgram-header');
         this.#setupSettingsListeners();
     }
     buildProjectsOverlay(projects) {
