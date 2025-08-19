@@ -15,7 +15,7 @@
 <div align="center">
 
 [![Versão](https://img.shields.io/badge/versão-1.5.1-blue.svg)](https://github.com/rm0ntoya/wgram-wplace)
-[![Licença](https://img.shields.io/badge/licença-MPL--2.1-brightgreen.svg)](https://github.com/rm0ntoya/wgram-wplace/blob/main/LICENSE)
+[![Licença](https://img.shields.io/badge/licença-MPL--2.2-brightgreen.svg)](https://github.com/rm0ntoya/wgram-wplace/blob/main/LICENSE)
 [![Status](https://img.shields.io/badge/status-ativo-success.svg)](https://github.com/rm0ntoya/wgram-wplace)
 
 </div>
@@ -118,4 +118,4 @@ O seu apoio ajuda a manter o site no ar e motiva a criação de novas funcionali
 
 ## 📜 Licença
 
-Este projeto é distribuído sob a licença **MPL-2.1**. Para mais detalhes, consulte o ficheiro de licença no repositório.
+Este projeto é distribuído sob a licença **MPL-2.2**. Para mais detalhes, consulte o ficheiro de licença no repositório.
