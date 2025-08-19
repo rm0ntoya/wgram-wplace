@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.8
+// @version      2.9
 // @description  Um script de usuário para aprimorar a experiência no Wplace.live com login e salvamento na nuvem.
 // @author       rm0ntoya
 // @license      MPL-2.4

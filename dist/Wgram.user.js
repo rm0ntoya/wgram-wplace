@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      2.8
+// @version      2.9
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.2
@@ -168,9 +168,8 @@ this.colorPalette[colorKey].count++;
         const finalMoneyText = moneyAmount ? `Dinheiro: ${moneyAmount}` : 'Dinheiro: N/A';
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
-            .addDiv({ id: 'wgram-header' })
-                .addDiv({ id: 'wgram-drag-handle' }).buildElement()
-                .addImg({ alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
+            .addDiv({ id: 'wgram-header' })                
+                .addImg({ id: 'wgram-logo-handle', alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
             .addHr().buildElement()
@@ -245,7 +244,7 @@ this.colorPalette[colorKey].count++;
         .buildElement()
         .buildOverlay(document.body);
 
-        this.handleDrag('wgram-overlay', 'wgram-drag-handle');
+        this.handleDrag('wgram-overlay', 'wgram-logo-handle');
         this.#setupSettingsListeners();
     }
     buildProjectsOverlay(projects) {
