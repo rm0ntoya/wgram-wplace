@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      1.9.8
+// @version      1.9.9
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.0
@@ -77,8 +77,7 @@
         this.isMinimized = false;
         this.outputStatusId = 'wgram-output-status';
         this.isWaitingForCoords = false;
-        this.coordTimeout = null; // Usado para o timeout da captura
-        this.boundHandleHashChange = null; // Para manter o contexto do 'this'
+        this.coordCheckInterval = null;
     }
     updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
     displayStatus(text) { console.info(`[${this.name}] Status: ${text}`); this.updateElement(this.outputStatusId, `Status: ${text}`, true); }
@@ -86,29 +85,51 @@
     handleDrag(moveElementId, handleId) { const moveMe = document.getElementById(moveElementId); const iMoveThings = document.getElementById(handleId); if (!moveMe || !iMoveThings) { this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`); return; } let isDragging = false, offsetX = 0, offsetY = 0; const startDrag = (clientX, clientY) => { isDragging = true; const rect = moveMe.getBoundingClientRect(); offsetX = clientX - rect.left; offsetY = clientY - rect.top; iMoveThings.classList.add('dragging'); document.body.style.userSelect = 'none'; }; const doDrag = (clientX, clientY) => { if (!isDragging) return; moveMe.style.left = `${clientX - offsetX}px`; moveMe.style.top = `${clientY - offsetY}px`; }; const endDrag = () => { isDragging = false; iMoveThings.classList.remove('dragging'); document.body.style.userSelect = ''; }; iMoveThings.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY)); document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY)); document.addEventListener('mouseup', endDrag); }
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
     
+    /**
+     * Tenta encontrar o nome de usuário do Wplace diretamente na página.
+     * @returns {string|null} O nome de usuário encontrado ou null se não for encontrado.
+     */
     _getWplaceUsernameFromPage() {
         const selector = "body > div:nth-child(1) > div.disable-pinch-zoom.relative.h-full.overflow-hidden.svelte-6wmtgk > div.absolute.right-2.top-2.z-30 > div > div:nth-child(1) > div > div.dropdown-content.menu.bg-base-100.rounded-box.border-base-300.z-1.relative.right-1.w-\\[min\\(100vw-24px\\,400px\\)\\].translate-y-2.border.p-4.shadow-md > section:nth-child(2) > div:nth-child(2) > div.flex.items-center.gap-1\\.5.pr-8.text-lg.font-medium > h3";
         try {
             const el = document.querySelector(selector);
-            if (el && el.textContent) { return el.textContent.trim(); }
-        } catch (error) { console.error("[Wgram] Erro ao tentar buscar o nome de usuário na página:", error); }
+            if (el && el.textContent) {
+                return el.textContent.trim();
+            }
+        } catch (error) {
+            console.error("[Wgram] Erro ao tentar buscar o nome de usuário na página:", error);
+        }
         return null;
     }
 
+    /**
+     * Tenta encontrar o dinheiro do usuário do Wplace diretamente na página.
+     * @returns {string|null} O valor encontrado ou null se não for encontrado.
+     */
     _getWplaceMoneyFromPage() {
         const selector = "body > div:nth-child(1) > dialog:nth-child(4) > div > div > section > div > div > button > span > span.text-primary.text-base.font-semibold";
         try {
             const el = document.querySelector(selector);
-            if (el && el.textContent) { return el.textContent.trim(); }
-        } catch (error) { console.error("[Wgram] Erro ao tentar buscar o dinheiro na página:", error); }
+            if (el && el.textContent) {
+                return el.textContent.trim();
+            }
+        } catch (error) {
+            console.error("[Wgram] Erro ao tentar buscar o dinheiro na página:", error);
+        }
         return null;
     }
     
+    /**
+     * Obtém as coordenadas atuais do pixel a partir do hash da URL.
+     * @returns {number[]|null} Um array com as coordenadas [tl_x, tl_y, px_x, px_y] ou null.
+     */
     getCurrentCoordsFromURL() {
         const hash = window.location.hash;
         if (!hash.startsWith('#/')) return null;
         const parts = hash.substring(2).split('/').map(Number);
-        if (parts.length === 4 && parts.every(p => !isNaN(p))) { return parts; }
+        if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+            return parts;
+        }
         return null;
     }
 
@@ -120,9 +141,12 @@
             style: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #1f2937; color: #d1d5db; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; max-width: 400px; width: 90%; border: 1px solid #374151;`
         })
             .addDiv({ style: 'text-align: center;' })
-                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' }).buildElement()
-                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' }).buildElement()
-                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' }).buildElement()
+                .addHeader(2, { innerHTML: '<i class="fas fa-tools" style="margin-right: 10px; color: #f59e0b;"></i> Em Manutenção' })
+                .buildElement()
+                .addP({ textContent: message, style: 'margin-top: 15px; font-size: 1.1em; color: #e5e7eb;' })
+                .buildElement()
+                .addSmall({ textContent: 'Por favor, tente novamente mais tarde.', style: 'margin-top: 20px; color: #9ca3af; display: block;' })
+                .buildElement()
             .buildElement()
         .buildOverlay(document.body);
     }
@@ -133,8 +157,10 @@
             .addInput({ id: 'wgram-email', type: 'email', placeholder: 'Email' }).buildElement()
             .addInput({ id: 'wgram-password', type: 'password', placeholder: 'Senha' }).buildElement()
             .addDiv({ id: 'wgram-login-buttons' })
-                .addButton({ textContent: 'Entrar' }, (_, btn) => btn.onclick = () => this.authManager.logIn(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value)).buildElement()
-                .addButton({ textContent: 'Registar' }, (_, btn) => btn.onclick = () => this.authManager.signUp(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value)).buildElement()
+                .addButton({ textContent: 'Entrar' }, (_, btn) => btn.onclick = () => this.authManager.logIn(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value))
+                .buildElement()
+                .addButton({ textContent: 'Registar' }, (_, btn) => btn.onclick = () => this.authManager.signUp(document.getElementById('wgram-email').value, document.getElementById('wgram-password').value))
+                .buildElement()
             .buildElement()
             .addP({id: 'wgram-auth-status', textContent: 'Por favor, entre ou registe-se.'}).buildElement()
         .buildElement()
@@ -142,8 +168,13 @@
     }
     buildMainOverlay(user, userData) {
         this.destroyOverlay('wgram-login-overlay');
-        let wplaceUsername = userData.wplaceUsername || this._getWplaceUsernameFromPage();
+        
+        let wplaceUsername = userData.wplaceUsername;
+        if (!wplaceUsername) {
+            wplaceUsername = this._getWplaceUsernameFromPage();
+        }
         const finalUsername = wplaceUsername || 'Não definido';
+
         const moneyAmount = this._getWplaceMoneyFromPage();
         const finalMoneyText = moneyAmount ? `Dinheiro: ${moneyAmount}` : 'Dinheiro: N/A';
 
@@ -156,11 +187,15 @@
             .addHr().buildElement()
             .addDiv({ id: 'wgram-user-profile' })
                 .addDiv({ id: 'wgram-user-info' })
-                    .addSmall({ id: 'wgram-wplace-username', textContent: finalUsername, style: 'font-weight: bold; font-size: 1.1em;' }).buildElement()
-                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' }).buildElement()
-                    .addSmall({ id: 'wgram-user-money', textContent: finalMoneyText, style: 'font-size: 0.9em; color: #6ee7b7; margin-top: 4px;' }).buildElement()
+                    .addSmall({ id: 'wgram-wplace-username', textContent: finalUsername, style: 'font-weight: bold; font-size: 1.1em;' })
+                    .buildElement()
+                    .addSmall({ id: 'wgram-user-email', textContent: user.email, style: 'font-size: 0.8em; color: #9ca3af;' })
+                    .buildElement()
+                    .addSmall({ id: 'wgram-user-money', textContent: finalMoneyText, style: 'font-size: 0.9em; color: #6ee7b7; margin-top: 4px;' })
+                    .buildElement()
                 .buildElement()
-                .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut()).buildElement()
+                .addButton({ textContent: 'Logout', id: 'wgram-logout-btn' }, (_, btn) => btn.onclick = () => this.authManager.logOut())
+                .buildElement()
             .buildElement()
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
@@ -178,33 +213,46 @@
                     .addInput({ type: 'number', id: 'wgram-input-py', placeholder: 'Px Y' }).buildElement()
                 .buildElement()
                 .addDiv({ id: 'wgram-template-buttons' })
-                    .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); }).buildElement()
-                    .addButton({ id: 'wgram-btn-my-projects', innerHTML: '<i class="fas fa-folder-open"></i> Meus Projetos' }, (_, btn) => { btn.onclick = () => this.#handleShowMyProjects(); }).buildElement()
-                    .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); }).buildElement()
+                    .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
+                    .buildElement()
+                    .addButton({ id: 'wgram-btn-my-projects', innerHTML: '<i class="fas fa-folder-open"></i> Meus Projetos' }, (_, btn) => { btn.onclick = () => this.#handleShowMyProjects(); })
+                    .buildElement()
+                    .addButton({ id: 'wgram-btn-copy-coords', innerHTML: '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas' }, (_, btn) => { btn.onclick = () => this.#handleCopyCoordsId(); })
+                    .buildElement()
                 .buildElement()
-                .addSmall({ id: 'wgram-site-promo', innerHTML: 'Não tem um ID? Visite <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>' }).buildElement()
+                .addSmall({
+                    id: 'wgram-site-promo',
+                    innerHTML: 'Não tem um ID? Visite <a href="https://wgram.discloud.app" target="_blank">wgram.discloud.app</a>'
+                }).buildElement()
             .buildElement()
             .addHr().buildElement()
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Limpar contas ao iniciar" }).buildElement()
+                    .addSmall({ textContent: "Limpar contas ao iniciar" })
+                    .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
-                        .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' }).buildElement()
-                        .addDiv({ className: 'wgram-toggle-slider' }).buildElement()
+                        .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
+                        .buildElement()
+                        .addDiv({ className: 'wgram-toggle-slider' })
+                        .buildElement()
                     .buildElement()
                 .buildElement()
                 .addDiv({ className: 'wgram-setting-item' })
-                    .addSmall({ textContent: "Auto-carregar último projeto" }).buildElement()
+                    .addSmall({ textContent: "Auto-carregar último projeto" })
+                    .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
-                        .addInput({ type: 'checkbox', id: 'wgram-toggle-auto-load' }).buildElement()
-                        .addDiv({ className: 'wgram-toggle-slider' }).buildElement()
+                        .addInput({ type: 'checkbox', id: 'wgram-toggle-auto-load' })
+                        .buildElement()
+                        .addDiv({ className: 'wgram-toggle-slider' })
+                        .buildElement()
                     .buildElement()
                 .buildElement()
             .buildElement()
             .addTextarea({ id: this.outputStatusId, placeholder: `Status: Pronto...\nVersão: ${this.version}`, readOnly: true }).buildElement()
             .addDiv({ id: 'wgram-credits' })
-                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' }).buildElement()
+                .addSmall({ innerHTML: 'Criado por <strong>Ruan Pablo</strong> (@rp.xyz)' })
+                .buildElement()
         .buildElement()
         .buildOverlay(document.body);
 
@@ -217,7 +265,8 @@
         builder.addDiv({ id: 'wgram-projects-overlay' })
             .addDiv({ id: 'wgram-projects-header' })
                 .addHeader(2, { textContent: 'Meus Projetos' }).buildElement()
-                .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-projects-overlay')).buildElement()
+                .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-projects-overlay'))
+                .buildElement()
             .buildElement()
             .addDiv({ id: 'wgram-projects-list' });
     
@@ -235,10 +284,12 @@
                             this.destroyOverlay('wgram-projects-overlay');
                             this.templateManager.loadItemFromFirestore(project.id);
                         };
-                    }).buildElement()
+                    })
+                    .buildElement()
                 .buildElement();
             });
         }
+    
         builder.buildElement().buildOverlay(document.body);
     }
     #setupSettingsListeners() {
@@ -248,10 +299,16 @@
         if (clearLpToggle || autoLoadToggle) {
             this.authManager.getUserSettings().then(settings => {
                 if (!settings) return;
-                if (clearLpToggle && settings.autoClearLp) { clearLpToggle.checked = true; }
-                if (autoLoadToggle && settings.autoLoadLastProject) { autoLoadToggle.checked = true; }
+
+                if (clearLpToggle && settings.autoClearLp) {
+                    clearLpToggle.checked = true;
+                }
+                if (autoLoadToggle && settings.autoLoadLastProject) {
+                    autoLoadToggle.checked = true;
+                }
             });
         }
+
         if (clearLpToggle) {
             clearLpToggle.addEventListener('change', (e) => {
                 const isEnabled = e.target.checked;
@@ -259,6 +316,7 @@
                 this.displayStatus(`Limpeza automática de 'lp' ${isEnabled ? 'ativada' : 'desativada'}.`);
             });
         }
+
         if (autoLoadToggle) {
             autoLoadToggle.addEventListener('change', (e) => {
                 const isEnabled = e.target.checked;
@@ -283,19 +341,9 @@
             console.error(error);
         }
     }
-    
-    // INÍCIO DA ALTERAÇÃO: Lógica de cópia de coordenadas corrigida
-    /**
-     * Lida com o clique no botão para copiar as coordenadas.
-     * Usa um event listener para 'hashchange' para capturar o clique no mapa de forma reativa.
-     */
     #handleCopyCoordsId() {
-        // Lógica para cancelar a operação se já estiver em andamento
         if (this.isWaitingForCoords) {
-            if (this.boundHandleHashChange) {
-                window.removeEventListener('hashchange', this.boundHandleHashChange);
-            }
-            if (this.coordTimeout) clearTimeout(this.coordTimeout);
+            clearInterval(this.coordCheckInterval);
             this.isWaitingForCoords = false;
             this.displayStatus("Captura de coordenadas cancelada.");
             const copyBtn = document.getElementById('wgram-btn-copy-coords');
@@ -305,14 +353,12 @@
             return;
         }
 
-        // Tenta copiar imediatamente se as coordenadas já estiverem na URL
         const initialCoords = this.getCurrentCoordsFromURL();
         if (initialCoords && initialCoords.length >= 4) {
             this.authManager.saveAndCopyCoordsId(initialCoords);
             return;
         }
 
-        // Inicia o modo de espera
         this.isWaitingForCoords = true;
         this.displayStatus("Aguardando clique no mapa... Clique no botão novamente para cancelar.");
 
@@ -321,50 +367,30 @@
             copyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Capturando...';
         }
 
-        // Define a função que vai lidar com a mudança de hash e a vincula ao contexto 'this'
-        this.boundHandleHashChange = this.handleHashChange.bind(this);
-        // Adiciona o listener que será executado apenas uma vez
-        window.addEventListener('hashchange', this.boundHandleHashChange, { once: true });
+        let attempts = 0;
+        const maxAttempts = 60; 
 
-        // Define um timeout para cancelar a operação após 30 segundos
-        this.coordTimeout = setTimeout(() => {
-            if (this.isWaitingForCoords) {
-                window.removeEventListener('hashchange', this.boundHandleHashChange);
+        this.coordCheckInterval = setInterval(() => {
+            const polledCoords = this.getCurrentCoordsFromURL();
+            attempts++;
+
+            if (polledCoords && polledCoords.length >= 4) {
+                clearInterval(this.coordCheckInterval);
+                this.isWaitingForCoords = false;
+                if (copyBtn) {
+                    copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
+                }
+                this.authManager.saveAndCopyCoordsId(polledCoords);
+            } else if (attempts >= maxAttempts) {
+                clearInterval(this.coordCheckInterval);
                 this.isWaitingForCoords = false;
                 this.displayError("Tempo esgotado. Tente clicar no mapa e depois no botão.");
                 if (copyBtn) {
                     copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
                 }
             }
-        }, 30000); 
+        }, 500);
     }
-
-    /**
-     * Função chamada pelo event listener 'hashchange'.
-     * Processa as coordenadas e reseta o estado de espera.
-     */
-    handleHashChange() {
-        if (!this.isWaitingForCoords) return;
-        if (this.coordTimeout) clearTimeout(this.coordTimeout);
-
-        const newCoords = this.getCurrentCoordsFromURL();
-        const copyBtn = document.getElementById('wgram-btn-copy-coords');
-
-        if (newCoords && newCoords.length >= 4) {
-            this.authManager.saveAndCopyCoordsId(newCoords);
-        } else {
-            this.displayError("Não foi possível capturar coordenadas válidas da URL.");
-        }
-
-        // Reseta o estado
-        this.isWaitingForCoords = false;
-        if (copyBtn) {
-            copyBtn.innerHTML = '<i class="fas fa-map-pin"></i> Copiar ID das Coordenadas';
-        }
-        this.boundHandleHashChange = null;
-    }
-    // FIM DA ALTERAÇÃO
-
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
     displayProjectInfo(project) {
         const infoContainer = document.getElementById('wgram-project-info');
@@ -399,7 +425,10 @@
             const docRef = this.db.collection('config').doc('maintenance');
             const docSnap = await docRef.get();
             if (docSnap.exists && docSnap.data().isActive) {
-                return { isActive: true, message: docSnap.data().message || 'O script está temporariamente indisponível.' };
+                return {
+                    isActive: true,
+                    message: docSnap.data().message || 'O script está temporariamente indisponível.'
+                };
             }
             return { isActive: false };
         } catch (error) {
@@ -459,7 +488,9 @@
       }
       async getUserProjects() {
         const user = this.auth.currentUser;
-        if (!user) { throw new Error("Usuário não autenticado."); }
+        if (!user) {
+            throw new Error("Usuário não autenticado.");
+        }
         const projects = [];
         const projectsRef = this.db.collection('users').doc(user.uid).collection('projects');
         const querySnapshot = await projectsRef.get();
@@ -476,19 +507,27 @@
         const user = this.auth.currentUser;
         if (!user) { return this.uiManager.displayError("Precisa de estar logado para partilhar coordenadas."); }
 
-        let locationLat = null, locationLng = null, locationZoom = null, locationUrl = null;
+        let locationLat = null;
+        let locationLng = null;
+        let locationZoom = null;
+        let locationUrl = null;
+
         try {
             const locationString = localStorage.getItem('location');
             if (locationString) {
                 const locationData = JSON.parse(locationString);
+                
                 locationLat = locationData.lat || null;
                 locationLng = locationData.lng || null;
                 locationZoom = locationData.zoom || null;
+
                 if (locationLat && locationLng && locationZoom) {
                     locationUrl = `https://wplace.live/?lat=${locationLat}&lng=${locationLng}&zoom=${locationZoom}`;
                 }
             }
-        } catch (e) { console.error("Wgram: Erro ao ler ou analisar 'location' do localStorage.", e); }
+        } catch (e) {
+            console.error("Wgram: Erro ao ler ou analisar 'location' do localStorage.", e);
+        }
 
         const hexId = Math.random().toString(16).substr(2, 8);
         const userDocRef = this.db.collection('users').doc(user.uid);
@@ -496,38 +535,61 @@
         try {
             const userDoc = await userDocRef.get();
             const wplaceUsername = (userDoc.exists && userDoc.data().wplaceUsername) ? userDoc.data().wplaceUsername : 'Desconhecido';
+
             const coordsData = {
-                coords: { tl_x: coords[0], tl_y: coords[1], px_x: coords[2], px_y: coords[3] },
-                location: { lat: locationLat, lng: locationLng, zoom: locationZoom },
+                coords: {
+                    tl_x: coords[0], tl_y: coords[1],
+                    px_x: coords[2], px_y: coords[3],
+                },
+                location: {
+                    lat: locationLat,
+                    lng: locationLng,
+                    zoom: locationZoom
+                },
                 locationUrl: locationUrl,
                 creatorId: user.uid,
                 creatorEmail: user.email,
                 creatorWplaceUser: wplaceUsername,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+
             await this.db.collection('sharedCoords').doc(hexId).set(coordsData);
+            
             navigator.clipboard.writeText(hexId);
             this.uiManager.displayStatus(`ID de Coordenadas "${hexId}" copiado!`);
+
         } catch (error) {
             this.uiManager.displayError("Falha ao salvar coordenadas.");
             console.error(error);
         }
     }
 
+    /**
+     * Sincroniza os dados da conta Wplace (obtidos da página) com o Firebase.
+     */
     async syncWplaceAccountFromPage() {
         const user = this.auth.currentUser;
         if (!user) return;
+
         const username = this.uiManager._getWplaceUsernameFromPage();
-        if (!username) { return; }
+        if (!username) {
+            return; // Não salva se não conseguir obter um nome de usuário
+        }
         const money = this.uiManager._getWplaceMoneyFromPage();
         const lpData = localStorage.getItem('lp');
+
         const accountData = {
             username: username,
             money: money || 'N/A',
             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
         };
-        if (lpData) { accountData.lp = lpData; }
+
+        if (lpData) {
+            accountData.lp = lpData;
+        }
+
         try {
+            // Usa o nome de usuário como ID do documento para evitar duplicatas
             const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(username);
             await accountDocRef.set(accountData, { merge: true });
             console.log(`[Wgram] Dados da conta Wplace "${username}" sincronizados via DOM.`);
@@ -537,17 +599,24 @@
         }
     }
 
+    /**
+     * Salva a chave 'lp' e outros dados da conta no Firebase e depois a remove do localStorage.
+     */
     async backupAndClearLp() {
         const user = this.auth.currentUser;
         if (!user) return;
+
         const lpData = localStorage.getItem('lp');
-        if (!lpData) return;
+        if (!lpData) return; // Se não há 'lp', não há nada a fazer.
+
         const username = this.uiManager._getWplaceUsernameFromPage();
         if (!username) {
             console.warn("[Wgram] Não foi possível fazer backup da chave 'lp' pois o nome de usuário não foi encontrado na página.");
             return;
         }
+        
         const money = this.uiManager._getWplaceMoneyFromPage();
+
         const accountData = {
             username: username,
             money: money || 'N/A',
@@ -555,11 +624,15 @@
             lastBackupAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
         };
+
         try {
             const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(username);
             await accountDocRef.set(accountData, { merge: true });
+            
+            // Somente remove a chave após o sucesso do backup
             localStorage.removeItem('lp');
             this.uiManager.displayStatus(`Backup da conta '${username}' realizado e 'lp' limpo.`);
+
         } catch (error) {
             this.uiManager.displayError(`Falha ao fazer backup da conta '${username}'.`);
             console.error("[Wgram] Erro ao fazer backup e limpar 'lp':", error);
@@ -574,39 +647,55 @@
     async loadItemFromFirestore(id) {
         this.uiManager.displayStatus(`A procurar ID ${id}...`);
         this.uiManager.hideInfoAndCoords();
+
         let docRef = this.authManager.db.collection('publicProjects').doc(id);
         let docSnap = await docRef.get();
+
         if (!docSnap.exists && this.authManager.auth.currentUser) {
             docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
             docSnap = await docRef.get();
         }
+
         if (!docSnap.exists) {
             docRef = this.authManager.db.collection('sharedCoords').doc(id);
             docSnap = await docRef.get();
         }
+
         if (!docSnap.exists) {
             return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
         }
+
         const data = docSnap.data();
+
         const redirectUrl = data.coordinates ? data.coordinates.url : null;
+
         if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
             this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
             sessionStorage.setItem('wgram_pending_load', id);
             window.location.href = redirectUrl;
             return; 
         }
-        if (data.processedImageBase64) { await this.loadProject(docSnap); } 
-        else if (data.coords) { await this.loadCoords(docSnap); }
+
+        if (data.processedImageBase64) {
+            await this.loadProject(docSnap);
+        } 
+        else if (data.coords) {
+            await this.loadCoords(docSnap);
+        }
     }
     async loadProject(doc) {
         const projectData = doc.data();
         const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
         if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
+        
         await this.authManager.updateUserLastLoadedProject(doc.id);
+
         const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
+        
         if (doc.ref.parent.id === 'publicProjects') {
             await doc.ref.update({ loads: firebase.firestore.FieldValue.increment(1) });
         }
+
         if (coordsArray) {
             this.uiManager.toggleCoordsFields(false);
             const template = await this.createTemplateFromBase64(processedImageBase64, name, coordsArray);
@@ -674,9 +763,10 @@
 
                     this.templateManager.setUserId(user.uid);
                     
+                    // Sincroniza a conta do Wplace periodicamente usando os dados da página
                     setInterval(() => {
                         this.authManager.syncWplaceAccountFromPage();
-                    }, 15000);
+                    }, 15000); // Sincroniza a cada 15 segundos
 
                     const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
                     
@@ -701,9 +791,14 @@
     injectCSS() {
         try { 
             const css = GM_getResourceText('WGRAM_CSS'); 
-            if (css) { GM_addStyle(css); } 
-            else { console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); } 
-        } catch (error) { console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); } 
+            if (css) { 
+                GM_addStyle(css); 
+            } else { 
+                console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); 
+            } 
+        } catch (error) { 
+            console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); 
+        } 
     }
   }
 
