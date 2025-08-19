@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      3.1
+// @version      3.2
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.2
@@ -96,21 +96,25 @@ handleDrag(moveElementId, handleId) {
         this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`);
         return;
     }
-    
-    // Precisamos de uma referência ao 'this' da classe UIManager
-    const self = this; 
+
+    const self = this;
     let isDragging = false, offsetX = 0, offsetY = 0;
 
     const startDrag = (e) => {
-        // NOVA LÓGICA:
-        // Apenas impeça o arraste se o menu estiver ABERTO (!self.isMinimized)
-        // E o clique for exatamente no ícone.
-        if (!self.isMinimized && e.target.id === 'wgram-logo-handle') {
-            return; // Impede o arraste para permitir o clique de minimizar.
+        // Lista de elementos que NÃO devem iniciar o arraste
+        const nonDraggableTags = ['BUTTON', 'INPUT', 'TEXTAREA', 'A', 'SELECT', 'LABEL'];
+
+        // 1. Se o clique foi em um botão, input, etc., pare.
+        if (nonDraggableTags.includes(e.target.tagName)) {
+            return;
         }
 
-        // Em todos os outros casos (menu minimizado, ou menu aberto clicado fora do ícone),
-        // o arraste é permitido.
+        // 2. Se o menu estiver ABERTO e o clique foi no ÍCONE, pare (para permitir minimizar).
+        if (!self.isMinimized && e.target.id === 'wgram-logo-handle') {
+            return;
+        }
+
+        // Se passou pelas verificações, inicie o arraste
         isDragging = true;
         const rect = moveMe.getBoundingClientRect();
         offsetX = e.clientX - rect.left;
@@ -214,7 +218,7 @@ handleDrag(moveElementId, handleId) {
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
             .addDiv({ id: 'wgram-header' })                
-                .addImg({ id: 'wgram-logo-handle', alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;' }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
+                .addImg({ id: 'wgram-logo-handle', alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;',  draggable: false }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
             .addHr().buildElement()
@@ -289,7 +293,7 @@ handleDrag(moveElementId, handleId) {
         .buildElement()
         .buildOverlay(document.body);
 
-this.handleDrag('wgram-overlay', 'wgram-header');
+this.handleDrag('wgram-overlay', 'wgram-overlay');
         this.#setupSettingsListeners();
     }
     buildProjectsOverlay(projects) {
