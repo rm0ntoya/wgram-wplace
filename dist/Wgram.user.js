@@ -96,15 +96,21 @@ handleDrag(moveElementId, handleId) {
         this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`);
         return;
     }
+    
+    // Precisamos de uma referência ao 'this' da classe UIManager
+    const self = this; 
     let isDragging = false, offsetX = 0, offsetY = 0;
-    // Modificamos startDrag para receber o evento 'e'
+
     const startDrag = (e) => {
-        // Se o clique foi exatamente no ícone, não inicie o arraste!
-        // Isso permite que o clique para minimizar funcione.
-        if (e.target.id === 'wgram-logo-handle') {
-            return;
+        // NOVA LÓGICA:
+        // Apenas impeça o arraste se o menu estiver ABERTO (!self.isMinimized)
+        // E o clique for exatamente no ícone.
+        if (!self.isMinimized && e.target.id === 'wgram-logo-handle') {
+            return; // Impede o arraste para permitir o clique de minimizar.
         }
 
+        // Em todos os outros casos (menu minimizado, ou menu aberto clicado fora do ícone),
+        // o arraste é permitido.
         isDragging = true;
         const rect = moveMe.getBoundingClientRect();
         offsetX = e.clientX - rect.left;
@@ -112,17 +118,19 @@ handleDrag(moveElementId, handleId) {
         iMoveThings.classList.add('dragging');
         document.body.style.userSelect = 'none';
     };
+
     const doDrag = (clientX, clientY) => {
         if (!isDragging) return;
         moveMe.style.left = `${clientX - offsetX}px`;
         moveMe.style.top = `${clientY - offsetY}px`;
     };
+
     const endDrag = () => {
         isDragging = false;
         iMoveThings.classList.remove('dragging');
         document.body.style.userSelect = '';
     };
-    // Passamos o evento 'e' completo para a função startDrag
+
     iMoveThings.addEventListener('mousedown', (e) => startDrag(e));
     document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY));
     document.addEventListener('mouseup', endDrag);
