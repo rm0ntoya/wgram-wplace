@@ -68,7 +68,7 @@ export default class Template {
                 const pixelData = tempCtx.getImageData(0, 0, 1, 1).data;
 
                 // Se o píxel for transparente, ignora-o
-                if (pixelData[3] === 0) continue;
+                if (pixelData[3] < 50) continue;;
 
                 // Lógica para analisar e catalogar cada cor encontrada na imagem.
                 const colorKey = `${pixelData[0]},${pixelData[1]},${pixelData[2]}`;
