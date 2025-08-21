@@ -1,20 +1,23 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      3.2
-// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com sincronização de contas e novo filtro de cores.
+// @version      3.8
+// @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com busca de locais integrada e suporte mobile aprimorado.
 // @author       rm0ntoya & Gemini
-// @license      MPL-2.2
+// @license      MPL-2.0
 // @homepageURL  https://github.com/rm0ntoya/wgram-wplace
 // @supportURL   https://github.com/rm0ntoya/wgram-wplace/issues
 // @icon         https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png
 
 // @match        *://*.wplace.live/*
 
+// @connect      nominatim.openstreetmap.org
+
 // @grant        GM_getResourceText
 // @grant        GM_addStyle
 // @grant        GM.setValue
 // @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
 
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js
 // @require      https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js
@@ -89,70 +92,74 @@ this.colorPalette[colorKey].count++;
     updateElement(id, html, isSafe = false) { const element = document.getElementById(id.replace(/^#/, '')); if (!element) return; if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) { element.value = html; } else { element[isSafe ? 'textContent' : 'innerHTML'] = html; } }
     displayStatus(text) { console.info(`[${this.name}] Status: ${text}`); this.updateElement(this.outputStatusId, `Status: ${text}`, true); }
     displayError(text) { console.error(`[${this.name}] Erro: ${text}`); this.updateElement(this.outputStatusId, `Erro: ${text}`, true); }
-handleDrag(moveElementId, handleId) {
-    const moveMe = document.getElementById(moveElementId);
-    const iMoveThings = document.getElementById(handleId);
-    if (!moveMe || !iMoveThings) {
-        this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`);
-        return;
-    }
+    handleDrag(moveElementId, handleId) {
+        const moveMe = document.getElementById(moveElementId);
+        const iMoveThings = document.getElementById(handleId);
+        if (!moveMe || !iMoveThings) {
+            this.displayError(`Elemento de arrastar não encontrado: ${moveElementId} ou ${handleId}`);
+            return;
+        }
 
-    const self = this;
-    let isDragging = false, offsetX = 0, offsetY = 0;
-
-    const startDrag = (e) => {
-        // Lista de elementos que NÃO devem iniciar o arraste
+        let isDragging = false, offsetX = 0, offsetY = 0;
         const nonDraggableTags = ['BUTTON', 'INPUT', 'TEXTAREA', 'A', 'SELECT', 'LABEL'];
 
-        // 1. Se o clique foi em um botão, input, etc., pare.
-        if (nonDraggableTags.includes(e.target.tagName)) {
-            return;
-        }
+        const dragStart = (e) => {
+            if (nonDraggableTags.includes(e.target.tagName)) return;
+            if (!this.isMinimized && e.target.id === 'wgram-logo-handle') return;
 
-        // 2. Se o menu estiver ABERTO e o clique foi no ÍCONE, pare (para permitir minimizar).
-        if (!self.isMinimized && e.target.id === 'wgram-logo-handle') {
-            return;
-        }
+            isDragging = true;
+            moveMe.style.position = 'fixed'; // Garante que o posicionamento seja fixo durante o arraste
 
-        // Se passou pelas verificações, inicie o arraste
-        isDragging = true;
-        const rect = moveMe.getBoundingClientRect();
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
-        iMoveThings.classList.add('dragging');
-        document.body.style.userSelect = 'none';
-    };
+            const rect = moveMe.getBoundingClientRect();
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
 
-    const doDrag = (clientX, clientY) => {
-        if (!isDragging) return;
-        moveMe.style.left = `${clientX - offsetX}px`;
-        moveMe.style.top = `${clientY - offsetY}px`;
-    };
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
 
-    const endDrag = () => {
-        isDragging = false;
-        iMoveThings.classList.remove('dragging');
-        document.body.style.userSelect = '';
-    };
+            iMoveThings.classList.add('dragging');
+            document.body.style.userSelect = 'none';
+        };
 
-    iMoveThings.addEventListener('mousedown', (e) => startDrag(e));
-    document.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY));
-    document.addEventListener('mouseup', endDrag);
-}
+        const dragMove = (e) => {
+            if (!isDragging) return;
+            if (e.type === 'touchmove') {
+                e.preventDefault(); // Previne o scroll da página no mobile
+            }
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+            moveMe.style.left = `${clientX - offsetX}px`;
+            moveMe.style.top = `${clientY - offsetY}px`;
+        };
+
+        const dragEnd = () => {
+            isDragging = false;
+            iMoveThings.classList.remove('dragging');
+            document.body.style.userSelect = '';
+        };
+
+        // Eventos de Mouse
+        iMoveThings.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('mouseup', dragEnd);
+
+        // Eventos de Toque (Mobile)
+        iMoveThings.addEventListener('touchstart', dragStart, { passive: false });
+        document.addEventListener('touchmove', dragMove, { passive: false });
+        document.addEventListener('touchend', dragEnd);
+    }
     destroyOverlay(id) { const overlay = document.getElementById(id); if (overlay) { overlay.remove(); } }
-    
+
     _getWplaceUsernameFromPage() {
         const selector = "body > div:nth-child(1) > div.disable-pinch-zoom.relative.h-full.overflow-hidden.svelte-6wmtgk > div.absolute.right-2.top-2.z-30 > div > div:nth-child(1) > div > div.dropdown-content.menu.bg-base-100.rounded-box.border-base-300.z-1.relative.right-1.w-\\[min\\(100vw-24px\\,400px\\)\\].translate-y-2.border.p-4.shadow-md > section:nth-child(2) > div:nth-child(2) > div.flex.items-center.gap-1\\.5.pr-8.text-lg.font-medium > h3";
         try {
             const el = document.querySelector(selector);
             if (el && el.textContent) {
-                console.log("[Wgram] Nome de usuário encontrado na página:", el.textContent.trim());
                 return el.textContent.trim();
             }
         } catch (error) {
             console.error("[Wgram] Erro ao tentar buscar o nome de usuário na página:", error);
         }
-        console.log("[Wgram] Elemento do nome de usuário não encontrado na página.");
         return null;
     }
 
@@ -161,20 +168,18 @@ handleDrag(moveElementId, handleId) {
         try {
             const el = document.querySelector(selector);
             if (el && el.textContent) {
-                console.log("[Wgram] Dinheiro encontrado na página:", el.textContent.trim());
                 return el.textContent.trim();
             }
         } catch (error) {
             console.error("[Wgram] Erro ao tentar buscar o dinheiro na página:", error);
         }
-        console.log("[Wgram] Elemento do dinheiro não encontrado na página.");
         return null;
     }
 
     buildMaintenanceOverlay(message) {
         this.destroyOverlay('wgram-overlay');
         this.destroyOverlay('wgram-login-overlay');
-        this.overlayBuilder.addDiv({ 
+        this.overlayBuilder.addDiv({
             id: 'wgram-maintenance-overlay',
             style: `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #1f2937; color: #d1d5db; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); z-index: 9999; max-width: 400px; width: 90%; border: 1px solid #374151;`
         })
@@ -206,18 +211,14 @@ handleDrag(moveElementId, handleId) {
     }
     buildMainOverlay(user, userData) {
         this.destroyOverlay('wgram-login-overlay');
-        
-        let wplaceUsername = userData.wplaceUsername;
-        if (!wplaceUsername) {
-            wplaceUsername = this._getWplaceUsernameFromPage();
-        }
-        const finalUsername = wplaceUsername || 'Não definido';
 
+        let wplaceUsername = userData.wplaceUsername || this._getWplaceUsernameFromPage();
+        const finalUsername = wplaceUsername || 'Não definido';
         const moneyAmount = this._getWplaceMoneyFromPage();
         const finalMoneyText = moneyAmount ? `Dinheiro: ${moneyAmount}` : 'Dinheiro: N/A';
 
         this.overlayBuilder.addDiv({ id: 'wgram-overlay' })
-            .addDiv({ id: 'wgram-header' })                
+            .addDiv({ id: 'wgram-header' })
                 .addImg({ id: 'wgram-logo-handle', alt: 'Ícone do Wgram', src: 'https://raw.githubusercontent.com/rm0ntoya/wgram-wplace/refs/heads/main/src/assets/icon.png', style: 'cursor: pointer;',  draggable: false }, (_, img) => img.addEventListener('click', () => this.#toggleMinimize())).buildElement()
                 .addHeader(1, { textContent: this.name }).buildElement()
             .buildElement()
@@ -236,7 +237,7 @@ handleDrag(moveElementId, handleId) {
             .buildElement()
             .addHr().buildElement()
             .addDiv({ id: 'wgram-template-controls' })
-                .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'Cole o ID do Projeto/Coordenadas' }).buildElement()
+                .addInput({ id: 'wgram-project-id', type: 'text', placeholder: 'ID do Projeto, Coordenadas ou Local' }).buildElement()
                 .addDiv({ id: 'wgram-project-info' })
                     .addP({ id: 'wgram-info-name' }).buildElement()
                     .addP({ id: 'wgram-info-creator' }).buildElement()
@@ -250,7 +251,7 @@ handleDrag(moveElementId, handleId) {
                     .addInput({ type: 'number', id: 'wgram-input-py', placeholder: 'Px Y' }).buildElement()
                 .buildElement()
                 .addDiv({ id: 'wgram-template-buttons' })
-                    .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-cloud-download-alt"></i> Carregar por ID' }, (_, btn) => { btn.onclick = () => this.#handleLoadProject(); })
+                    .addButton({ id: 'wgram-btn-load', innerHTML: '<i class="fas fa-search"></i> Buscar' }, (_, btn) => { btn.onclick = () => this.#handleSearchAndLoad(); })
                     .buildElement()
                     .addButton({ id: 'wgram-btn-my-projects', innerHTML: '<i class="fas fa-folder-open"></i> Meus Projetos' }, (_, btn) => { btn.onclick = () => this.#handleShowMyProjects(); })
                     .buildElement()
@@ -298,7 +299,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
     }
     buildProjectsOverlay(projects) {
         this.destroyOverlay('wgram-projects-overlay');
-        const builder = new Overlay(); 
+        const builder = new Overlay();
         builder.addDiv({ id: 'wgram-projects-overlay' })
             .addDiv({ id: 'wgram-projects-header' })
                 .addHeader(2, { textContent: 'Meus Projetos' }).buildElement()
@@ -306,7 +307,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
                 .buildElement()
             .buildElement()
             .addDiv({ id: 'wgram-projects-list' });
-    
+
         if (projects.length === 0) {
             builder.addP({ textContent: 'Você ainda não tem projetos.' }).buildElement();
         } else {
@@ -326,22 +327,61 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
                 .buildElement();
             });
         }
-    
+
         builder.buildElement().buildOverlay(document.body);
     }
 
-    buildColorFilterOverlay(template) {
-        this.destroyOverlay('wgram-color-filter-overlay'); 
+    buildLocationResultsOverlay(results) {
+        this.destroyOverlay('wgram-location-results-overlay');
         const builder = new Overlay();
-    
-        builder.addDiv({ id: 'wgram-color-filter-overlay' }) 
+        builder.addDiv({ id: 'wgram-location-results-overlay' })
+            .addDiv({ id: 'wgram-location-results-header' })
+                .addHeader(2, { textContent: 'Resultados da Busca' }).buildElement()
+                .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-location-results-overlay'))
+                .buildElement()
+            .buildElement()
+            .addDiv({ id: 'wgram-location-results-list' });
+
+        if (results.length === 0) {
+            builder.addP({ textContent: 'Nenhum local encontrado.' }).buildElement();
+        } else {
+            results.forEach(result => {
+                const displayName = result.display_name || 'Local desconhecido';
+                const nameParts = displayName.split(',');
+                const primaryName = nameParts[0];
+                const address = nameParts.slice(1).join(',').trim();
+
+                builder.addDiv({ className: 'wgram-location-result-item' })
+                    .addDiv({ className: 'wgram-location-result-info' })
+                        .addP({ textContent: primaryName, style: 'font-weight: bold;' }).buildElement()
+                        .addSmall({ textContent: address }).buildElement()
+                    .buildElement()
+                    .addButton({ innerHTML: '<i class="fas fa-map-marked-alt"></i> Ir' }, (_, btn) => {
+                        btn.onclick = () => {
+                            this.destroyOverlay('wgram-location-results-overlay');
+                            this.apiManager.navigateToLocation(result.lat, result.lon);
+                        };
+                    })
+                    .buildElement()
+                .buildElement();
+            });
+        }
+        builder.buildElement().buildOverlay(document.body);
+    }
+
+
+    buildColorFilterOverlay(template) {
+        this.destroyOverlay('wgram-color-filter-overlay');
+        const builder = new Overlay();
+
+        builder.addDiv({ id: 'wgram-color-filter-overlay' })
             .addDiv({ id: 'wgram-color-filter-header' })
                 .addHeader(2, { textContent: 'Filtro de Cores' }).buildElement()
                 .addButton({ innerHTML: '<i class="fas fa-times"></i>' }, (_, btn) => btn.onclick = () => this.destroyOverlay('wgram-color-filter-overlay'))
                 .buildElement()
             .buildElement()
-            .addDiv({ id: 'wgram-color-filter-list' }); 
-    
+            .addDiv({ id: 'wgram-color-filter-list' });
+
         if (!template || !template.colorPalette) {
             builder.addP({ textContent: 'Nenhuma paleta de cores encontrada para este template.' }).buildElement();
         } else {
@@ -393,7 +433,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
                 });
             }
         }
-    
+
         builder.buildElement().buildOverlay(document.body);
     }
 
@@ -430,11 +470,33 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
             });
         }
     }
-    #handleLoadProject() {
-        const projectId = document.getElementById('wgram-project-id').value.trim();
-        if (!projectId) { return this.displayError("Por favor, insira um ID."); }
-        this.templateManager.loadItemFromFirestore(projectId);
+
+    async #handleSearchAndLoad() {
+        const query = document.getElementById('wgram-project-id').value.trim();
+        if (!query) {
+            return this.displayError("Por favor, insira um ID ou local para buscar.");
+        }
+
+        this.displayStatus(`Buscando por "${query}"...`);
+        const wasIdFound = await this.templateManager.loadItemFromFirestore(query);
+
+        if (!wasIdFound) {
+            this.displayStatus(`Nenhum ID encontrado. Buscando como localização...`);
+            try {
+                const locations = await this.apiManager.searchLocation(query);
+                if (locations && locations.length > 0) {
+                    this.displayStatus(`${locations.length} local(is) encontrado(s).`);
+                    this.buildLocationResultsOverlay(locations);
+                } else {
+                    this.displayError(`Nenhum projeto, ID ou local encontrado para "${query}".`);
+                }
+            } catch (error) {
+                this.displayError("Ocorreu um erro ao buscar a localização.");
+                console.error("Location search error:", error);
+            }
+        }
     }
+
     async #handleShowMyProjects() {
         this.displayStatus("Buscando seus projetos...");
         try {
@@ -473,7 +535,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
         }
 
         let attempts = 0;
-        const maxAttempts = 60; 
+        const maxAttempts = 60;
 
         this.coordCheckInterval = setInterval(() => {
             const polledCoords = this.apiManager.getCurrentCoords();
@@ -497,7 +559,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
         }, 500);
     }
     toggleCoordsFields(show) { const coordsContainer = document.getElementById('wgram-coords-container'); if (coordsContainer) { coordsContainer.style.display = show ? 'grid' : 'none'; } }
-    
+
     displayProjectInfo(project, template) {
         const infoContainer = document.getElementById('wgram-project-info');
         if (infoContainer) {
@@ -645,7 +707,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
             const locationString = localStorage.getItem('location');
             if (locationString) {
                 const locationData = JSON.parse(locationString);
-                
+
                 locationLat = locationData.lat || null;
                 locationLng = locationData.lng || null;
                 locationZoom = locationData.zoom || null;
@@ -660,7 +722,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
 
         const hexId = Math.random().toString(16).substr(2, 8);
         const userDocRef = this.db.collection('users').doc(user.uid);
-        
+
         try {
             const userDoc = await userDocRef.get();
             const wplaceUsername = (userDoc.exists && userDoc.data().wplaceUsername) ? userDoc.data().wplaceUsername : 'Desconhecido';
@@ -683,7 +745,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
             };
 
             await this.db.collection('sharedCoords').doc(hexId).set(coordsData);
-            
+
             navigator.clipboard.writeText(hexId);
             this.uiManager.displayStatus(`ID de Coordenadas "${hexId}" copiado!`);
 
@@ -706,7 +768,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
 
         try {
             const accountDocRef = this.db.collection('users').doc(user.uid).collection('wplaceAccounts').doc(String(accountData.id));
-            
+
             const dataToSave = {
                 ...accountData,
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp()
@@ -728,53 +790,65 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
     constructor(scriptName, scriptVersion, uiManager, authManager) { this.scriptName = scriptName; this.scriptVersion = scriptVersion; this.uiManager = uiManager; this.authManager = authManager; this.userId = null; this.templates = []; this.templatesShouldBeDrawn = true; }
     setUserId(id) { this.userId = id; }
     async loadItemFromFirestore(id) {
-        this.uiManager.displayStatus(`A procurar ID ${id}...`);
         this.uiManager.hideInfoAndCoords();
 
-        let docRef = this.authManager.db.collection('publicProjects').doc(id);
-        let docSnap = await docRef.get();
+        let docRef, docSnap;
 
-        if (!docSnap.exists && this.authManager.auth.currentUser) {
-            docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
+        try {
+            // Tenta buscar em publicProjects
+            docRef = this.authManager.db.collection('publicProjects').doc(id);
             docSnap = await docRef.get();
+
+            // Se não encontrar e estiver logado, tenta nos projetos do usuário
+            if (!docSnap.exists && this.authManager.auth.currentUser) {
+                docRef = this.authManager.db.collection('users').doc(this.authManager.auth.currentUser.uid).collection('projects').doc(id);
+                docSnap = await docRef.get();
+            }
+
+            // Se ainda não encontrar, tenta em sharedCoords
+            if (!docSnap.exists) {
+                docRef = this.authManager.db.collection('sharedCoords').doc(id);
+                docSnap = await docRef.get();
+            }
+        } catch (e) {
+            // Se o ID for inválido para o Firestore, ele vai falhar.
+            // Consideramos isso como "não encontrado" e retornamos false.
+            console.warn("ID inválido para busca no Firestore, tratando como busca de local.", e.message);
+            return false;
         }
 
-        if (!docSnap.exists) {
-            docRef = this.authManager.db.collection('sharedCoords').doc(id);
-            docSnap = await docRef.get();
-        }
 
         if (!docSnap.exists) {
-            return this.uiManager.displayError("Nenhum projeto ou coordenadas encontrados com este ID.");
+            return false; // Retorna false se não encontrou em nenhuma coleção
         }
 
         const data = docSnap.data();
-
         const redirectUrl = data.coordinates ? data.coordinates.url : null;
 
         if (redirectUrl && redirectUrl !== window.location.href.split('#')[0]) {
             this.uiManager.displayStatus(`Redirecionando para a localização do projeto...`);
             sessionStorage.setItem('wgram_pending_load', id);
             window.location.href = redirectUrl;
-            return; 
+            return true;
         }
 
         if (data.processedImageBase64) {
             await this.loadProject(docSnap);
-        } 
+        }
         else if (data.coords) {
             await this.loadCoords(docSnap);
         }
+        return true; // Retorna true se encontrou e processou o ID
     }
     async loadProject(doc) {
         const projectData = doc.data();
         const { processedImageBase64, name, coordinates, ownerName, calculations } = projectData;
         if (!processedImageBase64) { return this.uiManager.displayError("O projeto encontrado não contém uma imagem de template."); }
-        
+
         await this.authManager.updateUserLastLoadedProject(doc.id);
 
         const coordsArray = coordinates ? [coordinates.tl_x, coordinates.tl_y, coordinates.px_x, coordinates.px_y].map(Number) : null;
-        
+
         if (doc.ref.parent.id === 'publicProjects') {
             await doc.ref.update({ loads: firebase.firestore.FieldValue.increment(1) });
         }
@@ -840,42 +914,69 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
 
   // --- Módulo: src/core/ApiManager.js ---
   class ApiManager {
-    constructor(templateManager, uiManager, authManager) { 
-        this.templateManager = templateManager; 
-        this.uiManager = uiManager; 
+    constructor(templateManager, uiManager, authManager) {
+        this.templateManager = templateManager;
+        this.uiManager = uiManager;
         this.authManager = authManager;
-        this.disableAll = false; 
-        this.coordsTilePixel = []; 
+        this.disableAll = false;
+        this.coordsTilePixel = [];
     }
     initializeApiListener() { window.addEventListener('message', async (event) => { const { data } = event; if (!data || !data.isWgramMessage || data.source !== 'wgram-spy') { return; } const endpoint = this.#parseEndpoint(data.endpoint); if (endpoint === 'tiles') { await this.#handleTileResponse(data); return; } if (data.jsonData) { this.#handleJsonResponse(endpoint, data.jsonData, data.endpoint); } }); }
     #parseEndpoint(url) { if (!url) return ''; return url.split('?')[0].split('/').filter(s => s && isNaN(Number(s)) && !s.includes('.')).pop() || ''; }
-    
-    #handleJsonResponse(endpoint, jsonData, fullUrl) { 
-        switch (endpoint) { 
-            case 'pixel': 
-                this.#processPixelCoords(fullUrl); 
+
+    #handleJsonResponse(endpoint, jsonData, fullUrl) {
+        switch (endpoint) {
+            case 'pixel':
+                this.#processPixelCoords(fullUrl);
                 break;
             case 'me':
                 this.#handleAccountInfo(jsonData);
                 break;
-        } 
+        }
     }
-    
+
     #processPixelCoords(url) { const tileCoords = url.split('?')[0].split('/').filter(s => s && !isNaN(Number(s))); const payload = new URLSearchParams(url.split('?')[1]); const pixelCoords = [payload.get('x'), payload.get('y')]; if (tileCoords.length < 2 || !pixelCoords[0] || !pixelCoords[1]) { return; } this.coordsTilePixel = [...tileCoords, ...pixelCoords].map(Number); }
     getCurrentCoords() { return this.coordsTilePixel; }
-    
+
     #handleAccountInfo(jsonData) {
         if (this.authManager) {
             this.authManager.saveWplaceAccountData(jsonData);
         }
     }
 
-    async #handleTileResponse(data) { 
-        let tileCoords = data.endpoint.split('/'); 
-        tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)]; 
-        const { blobID, blobData, blink } = data; 
-        const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords); 
-        window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*'); 
+    async #handleTileResponse(data) {
+        let tileCoords = data.endpoint.split('/');
+        tileCoords = [parseInt(tileCoords[tileCoords.length - 2], 10), parseInt(tileCoords[tileCoords.length - 1].replace('.png', ''), 10)];
+        const { blobID, blobData, blink } = data;
+        const modifiedBlob = await this.templateManager.drawTemplateOnTile(blobData, tileCoords);
+        window.postMessage({ isWgramMessage: true, source: 'wgram-main', blobID: blobID, blobData: modifiedBlob, blink: blink }, '*');
+    }
+
+    searchLocation(query) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=10&addressdetails=1`,
+                headers: { 'User-Agent': 'Wgram-Userscript/3.5' },
+                onload: function(response) {
+                    try {
+                        const data = JSON.parse(response.responseText);
+                        resolve(data);
+                    } catch (error) {
+                        reject(error);
+                    }
+                },
+                onerror: function(error) {
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    navigateToLocation(lat, lon) {
+        const zoom = 14.62;
+        const url = `https://wplace.live/?lat=${lat}&lng=${lon}&zoom=${zoom}`;
+        window.location.href = url;
     }
   }
 
@@ -924,21 +1025,21 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
 
   // --- Módulo: src/main.js ---
   class WgramScript {
-    constructor() { 
-        this.info = { name: GM_info.script.name, version: GM_info.script.version }; 
-        this.uiManager = new UIManager(this.info.name, this.info.version); 
-        this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager); 
-        this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager); 
-        this.apiManager = new ApiManager(this.templateManager, this.uiManager, this.authManager); 
-        this.injector = new Injector(); 
-        this.uiManager.authManager = this.authManager; 
-        this.uiManager.templateManager = this.templateManager; 
-        this.uiManager.apiManager = this.apiManager; 
+    constructor() {
+        this.info = { name: GM_info.script.name, version: GM_info.script.version };
+        this.uiManager = new UIManager(this.info.name, this.info.version);
+        this.authManager = new AuthManager(FIREBASE_CONFIG, this.uiManager);
+        this.templateManager = new TemplateManager(this.info.name, this.info.version, this.uiManager, this.authManager);
+        this.apiManager = new ApiManager(this.templateManager, this.uiManager, this.authManager);
+        this.injector = new Injector();
+        this.uiManager.authManager = this.authManager;
+        this.uiManager.templateManager = this.templateManager;
+        this.uiManager.apiManager = this.apiManager;
     }
     async start() {
         console.log(`[${this.info.name}] v${this.info.version} a iniciar...`);
         this.injectCSS();
-        
+
         const maintenanceStatus = await this.authManager.checkMaintenanceMode();
 
         if (maintenanceStatus.isActive) {
@@ -947,12 +1048,12 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
             this.authManager.onAuthStateChanged(async (user) => {
                 if (user) {
                     console.log("Utilizador logado:", user.email);
-                    
+
                     const userData = await this.authManager.getUserData();
                     const userSettings = userData ? (userData.settings || {}) : {};
 
                     this.uiManager.buildMainOverlay(user, userData || {});
-                    
+
                     if (userSettings && userSettings.autoClearLp) {
                         if (localStorage.getItem('lp')) {
                             localStorage.removeItem('lp');
@@ -965,7 +1066,7 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
                     this.apiManager.initializeApiListener();
 
                     const pendingLoadId = sessionStorage.getItem('wgram_pending_load');
-                    
+
                     if (pendingLoadId) {
                         console.log(`[${this.info.name}] Encontrado carregamento pendente para o ID: ${pendingLoadId}`);
                         sessionStorage.removeItem('wgram_pending_load');
@@ -985,16 +1086,16 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
         }
     }
     injectCSS() {
-        try { 
-            const css = GM_getResourceText('WGRAM_CSS'); 
-            if (css) { 
-                GM_addStyle(css); 
-            } else { 
-                console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`); 
-            } 
-        } catch (error) { 
-            console.error(`[${this.info.name}] Falha ao injetar CSS:`, error); 
-        } 
+        try {
+            const css = GM_getResourceText('WGRAM_CSS');
+            if (css) {
+                GM_addStyle(css);
+            } else {
+                console.warn(`[${this.info.name}] Recurso CSS 'WGRAM_CSS' não encontrado.`);
+            }
+        } catch (error) {
+            console.error(`[${this.info.name}] Falha ao injetar CSS:`, error);
+        }
     }
   }
 
