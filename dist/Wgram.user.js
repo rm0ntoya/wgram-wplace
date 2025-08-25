@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Wgram - Pixel Art Manager
 // @namespace    https://github.com/rm0ntoya
-// @version      3.8
+// @version      3.9
 // @description  Um script de usuário para carregar templates, partilhar coordenadas e gerenciar o localStorage no WGram, agora com busca de locais integrada e suporte mobile aprimorado.
 // @author       rm0ntoya & Gemini
 // @license      MPL-2.0
@@ -266,11 +266,11 @@ this.colorPalette[colorKey].count++;
             .addHr().buildElement()
             .addDiv({ id: 'wgram-settings' })
                 .addHeader(4, { textContent: 'Configurações' }).buildElement()
-                .addDiv({ className: 'wgram-setting-item' })
+                .addDiv({ className: 'wgram-setting-item', style: 'opacity: 0.6; cursor: not-allowed;' })
                     .addSmall({ textContent: "Limpar contas ao iniciar" })
                     .buildElement()
                     .addLabel({ className: 'wgram-toggle-switch' })
-                        .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp' })
+                        .addInput({ type: 'checkbox', id: 'wgram-toggle-clear-lp', disabled: true })
                         .buildElement()
                         .addDiv({ className: 'wgram-toggle-slider' })
                         .buildElement()
@@ -1049,17 +1049,19 @@ this.handleDrag('wgram-overlay', 'wgram-overlay');
                 if (user) {
                     console.log("Utilizador logado:", user.email);
 
+                    // --- MODIFICAÇÃO AQUI ---
+                    // Força a desativação da configuração no Firebase ao iniciar
+                    await this.authManager.updateUserSetting('autoClearLp', false);
+                    console.log("[Wgram] Configuração 'autoClearLp' foi forçadamente desativada no Firebase.");
+                    // --- FIM DA MODIFICAÇÃO ---
+
                     const userData = await this.authManager.getUserData();
                     const userSettings = userData ? (userData.settings || {}) : {};
 
                     this.uiManager.buildMainOverlay(user, userData || {});
 
-                    if (userSettings && userSettings.autoClearLp) {
-                        if (localStorage.getItem('lp')) {
-                            localStorage.removeItem('lp');
-                            this.uiManager.displayStatus("Chave 'lp' removida automaticamente.");
-                        }
-                    }
+                    // A verificação 'if (userSettings && userSettings.autoClearLp)' foi removida
+                    // pois a funcionalidade agora está permanentemente desativada pelo código acima.
 
                     this.templateManager.setUserId(user.uid);
                     this.injector.injectFetchSpy();
